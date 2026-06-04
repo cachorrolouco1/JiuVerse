@@ -47,6 +47,8 @@ import com.example.architecture.views.ModerationTab
 import com.example.architecture.views.BattlePassTab
 import com.example.architecture.views.TournamentsTab
 import com.example.architecture.views.AdminTab
+import com.example.architecture.views.LandscapeSandboxTab
+import androidx.compose.material.icons.filled.Landscape
 import androidx.compose.material.icons.filled.Hearing
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Home
@@ -149,7 +151,8 @@ fun ArchitectureHubMainScreen(
         WorkbookTabItem("Moderação & Trust", Icons.Default.Shield, "tab_moderation"),
         WorkbookTabItem("Passe Batalha", Icons.Default.Star, "tab_battlepass"),
         WorkbookTabItem("Torneios eSports", Icons.Default.EmojiEvents, "tab_tournaments"),
-        WorkbookTabItem("Painel Admin (CTO)", Icons.Default.Settings, "tab_admin_cockpit")
+        WorkbookTabItem("Painel Admin (CTO)", Icons.Default.Settings, "tab_admin_cockpit"),
+        WorkbookTabItem("Mundo Landscape (Live)", Icons.Default.Landscape, "tab_landscape_mmo")
     )
 
     Column(
@@ -288,6 +291,7 @@ fun ArchitectureHubMainScreen(
                     16 -> BattlePassTab(viewModel = viewModel)
                     17 -> TournamentsTab(viewModel = viewModel)
                     18 -> AdminTab(viewModel = viewModel)
+                    19 -> LandscapeSandboxTab(viewModel = viewModel)
                 }
             }
         }
