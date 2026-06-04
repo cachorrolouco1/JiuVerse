@@ -3,6 +3,7 @@ package com.example.architecture.views
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -66,8 +67,12 @@ data class VirtualMmoCharacter(
     val defaultGridY: Float,
     var currentGridX: Float,
     var currentGridY: Float,
-    val baseSpeechBubble: String,
-    val isNpc: Boolean
+    var baseSpeechBubble: String,
+    val isNpc: Boolean,
+    val level: Int = 1,
+    var isOnline: Boolean = true,
+    var isFriend: Boolean = false,
+    var statusText: String = "Online"
 )
 
 enum class MovementState {
@@ -245,7 +250,11 @@ fun OverviewTab(
                 currentGridX = 3f,
                 currentGridY = 4f,
                 baseSpeechBubble = "Oss! Treino das 19h no tatame real tá de pé?",
-                isNpc = true
+                isNpc = true,
+                level = 18,
+                isOnline = true,
+                isFriend = true,
+                statusText = "Online"
             ),
             VirtualMmoCharacter(
                 name = "Guilherme",
@@ -257,7 +266,11 @@ fun OverviewTab(
                 currentGridX = 8f,
                 currentGridY = 5f,
                 baseSpeechBubble = "Foco na raspagem de meia-guarda!",
-                isNpc = true
+                isNpc = true,
+                level = 12,
+                isOnline = true,
+                isFriend = false,
+                statusText = "Disponível"
             ),
             VirtualMmoCharacter(
                 name = "Dragão Negro",
@@ -269,7 +282,11 @@ fun OverviewTab(
                 currentGridX = 4f,
                 currentGridY = 2f,
                 baseSpeechBubble = "Quem ousa me desafiar na arena PvP?",
-                isNpc = true
+                isNpc = true,
+                level = 99,
+                isOnline = true,
+                isFriend = false,
+                statusText = "No Fight ⚔️"
             )
         )
     }
@@ -327,6 +344,21 @@ fun OverviewTab(
 
     // Telepathy chat text state
     var textMessageInput by remember { mutableStateOf("") }
+
+    // --- EXPERT CHAT SYSTEM STATES ---
+    var chatChannelSelected by remember { mutableStateOf("GLOBAL") } // "GLOBAL", "LOCAL", "ACADEMIA", "PRIVADO"
+    var whisperRecipientByName by remember { mutableStateOf("Laura") } // Which player we are messaging in PRIVADO
+    val mutedPlayersList = remember { mutableStateListOf<String>() } // Names of muted players
+    val blockedPlayersList = remember { mutableStateListOf<String>() } // Names of blocked players
+    var lastChatMessageSentTimestamp by remember { mutableStateOf(0L) } // For anti-spam/flood
+    var isModerationPanelDialogVisible by remember { mutableStateOf(false) } // Open safety settings panel
+    var chatFilterTextKeyword by remember { mutableStateOf("") }
+    
+    // --- SOCKET.IO REALTIME PRESENCE & SIDEBAR ACTIONS ---
+    var expandedPlayerName by remember { mutableStateOf<String?>(null) }
+    var socketConnectionStatus by remember { mutableStateOf("Conectado") } // Conectado, Re-conectando, Latência oscilando
+    var socketConnectionPing by remember { mutableStateOf(12) }
+    var isPresenceSimulationActive by remember { mutableStateOf(true) } // Randomly toggles presence states in loop // To filter logs
 
     // --- JOYSTICK TOUCH STATE ---
     var joystickActive by remember { mutableStateOf(false) }
@@ -437,34 +469,80 @@ fun OverviewTab(
 
             // 5. BOOMING MULTIPLAYER SOCKETS EMULATOR (Handles hundreds of players interactions)
             npcs.forEachIndexed { idx, npc ->
-                // Move other players around randomly
-                if (Math.random() < 0.015) {
-                    val nx = (1..9).random()
-                    val ny = (1..9).random()
-                    if (isCellWalkable(nx, ny)) {
-                        npc.currentGridX = nx.toFloat()
-                        npc.currentGridY = ny.toFloat()
+                val isBlocked = blockedPlayersList.contains(npc.name)
+                val isMuted = mutedPlayersList.contains(npc.name)
+
+                if (!isBlocked) {
+                    // Move other players around randomly
+                    if (Math.random() < 0.015) {
+                        val nx = (1..9).random()
+                        val ny = (1..9).random()
+                        if (isCellWalkable(nx, ny)) {
+                            npc.currentGridX = nx.toFloat()
+                            npc.currentGridY = ny.toFloat()
+                            
+                            val socketTelemetry = listOf(
+                                "📡 [SOCKET] Cliente #${1000 + idx} (${npc.handle}) se moveu para (X=$nx, Y=$ny)",
+                                "📨 [WS_EMIT] Broadcast para 250 clientes na sala \"praça_central\"",
+                                "⚡ [SOCKET_SYNC] Sincronização UDP concluída. Conexões ativas: 14.250"
+                            ).random()
+                            gameEvents.add(0, socketTelemetry)
+                        }
+                    }
+                    
+                    // Simulate socket.io real-time status/presence changes
+                    if (isPresenceSimulationActive && Math.random() < 0.003) {
+                        val randomStatus = listOf("Online", "Treinando", "Meditação", "Ausente", "Em Combate ⚔️", "Desconectado").random()
+                        if (randomStatus == "Desconectado") {
+                            if (npc.isOnline) {
+                                npc.isOnline = false
+                                gameEvents.add(0, "📶 [SOCKET.IO] Presença: ${npc.handle} se desconectou do servidor.")
+                            }
+                        } else {
+                            if (!npc.isOnline) {
+                                npc.isOnline = true
+                                npc.statusText = "Online"
+                                gameEvents.add(0, "📶 [SOCKET.IO] Presença: ${npc.handle} conectou via Socket.IO real-time.")
+                            } else {
+                                npc.statusText = randomStatus
+                                gameEvents.add(0, "📶 [SOCKET.IO] Presença: ${npc.handle} atualizou status para '$randomStatus'")
+                            }
+                        }
+                    }
+
+                    // Random comments/emotes from simulated sockets
+                    if (!isMuted && Math.random() < 0.003) {
+                        val channel = listOf("GLOBAL", "LOCAL", "ACADEMIA").random()
+                        val randomLines = listOf(
+                            "Foco na raspagem!",
+                            "Hoje tem treino às 19h no tatame Alliance!",
+                            "Onde resgata a faixa do Battle Pass?",
+                            "OSS! Mestre Flávio!",
+                            "Arena PvP tá pegando fogo!"
+                        )
+                        val messageText = randomLines.random()
                         
-                        val socketTelemetry = listOf(
-                            "📡 [SOCKET] Cliente #${1000 + idx} (${npc.handle}) se moveu para (X=$nx, Y=$ny)",
-                            "📨 [WS_EMIT] Broadcast para 250 clientes na sala \"praça_central\"",
-                            "⚡ [SOCKET_SYNC] Sincronização UDP concluída. Conexões ativas: 14.250"
-                        ).random()
-                        gameEvents.add(0, socketTelemetry)
+                        // Update speech bubbles for local simulation
+                        if (npc.isOnline) {
+                            npc.baseSpeechBubble = messageText
+                            
+                            val formattedMsg = when (channel) {
+                                "LOCAL" -> "🔊 [LOCAL] ${npc.name}: \"$messageText\""
+                                "ACADEMIA" -> "🥋 [ACADEMIA] ${npc.name}: \"$messageText\""
+                                else -> "🌍 [GLOBAL] ${npc.name}: \"$messageText\""
+                            }
+                            gameEvents.add(0, formattedMsg)
+                        }
                     }
                 }
-                // Random comments/emotes from simulated sockets
-                if (Math.random() < 0.003) {
-                    val randomLines = listOf(
-                        "Foco na raspagem!",
-                        "Hoje tem treino às 19h no tatame Alliance!",
-                        "Onde resgata a faixa do Battle Pass?",
-                        "OSS! Mestre Flávio!",
-                        "Arena PvP tá pegando fogo!"
-                    )
-                    gameEvents.add(0, "💬 CHAT ${npc.name.uppercase()}: \"${randomLines.random()}\"")
+            }
+            if (Math.random() < 0.03) {
+                socketConnectionPing = (9..19).random()
+                if (Math.random() < 0.1) {
+                    socketConnectionStatus = listOf("Conectado", "Sincronizando", "Latência boa").random()
                 }
             }
+
             if (gameEvents.size > 80) {
                 gameEvents.removeRange(60, gameEvents.size)
             }
@@ -1030,66 +1108,77 @@ fun OverviewTab(
                     }
                 }
 
-                // NPC DIALOG BUBBLES & FLOATING NAMEPLATES OVERLAY
+                // --- NPC FLOATING NAMEPLATES & DIALOG BUBBLES ---
                 npcs.forEach { npc ->
-                    val (xDp, yDp) = getScreenOffsetDp(npc.currentGridX, npc.currentGridY)
-
-                    // Floating nameplate (Always visible)
-                    val npcBeltTextColor = if (npc.beltColor == Color.White) Color.Black else Color.White
-                    Column(
-                        modifier = Modifier
-                            .offset(x = xDp - 50.dp, y = yDp - 46.dp)
-                            .background(Color(0xD90F172A), RoundedCornerShape(4.dp))
-                            .border(0.5.dp, npc.beltColor.copy(alpha = 0.8f), RoundedCornerShape(4.dp))
-                            .width(100.dp)
-                            .padding(horizontal = 4.dp, vertical = 2.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                    val isBlocked = blockedPlayersList.contains(npc.name)
+                    val isMuted = mutedPlayersList.contains(npc.name)
+                    
+                    if (!isBlocked) {
+                        val (xDp, yDp) = getScreenOffsetDp(npc.currentGridX, npc.currentGridY)
+    
+                        // Floating nameplate (Always visible)
+                        val npcBeltTextColor = if (npc.beltColor == Color.White) Color.Black else Color.White
+                        Column(
+                            modifier = Modifier
+                                .offset(x = xDp - 50.dp, y = yDp - 46.dp)
+                                .background(Color(0xD90F172A), RoundedCornerShape(4.dp))
+                                .border(0.5.dp, npc.beltColor.copy(alpha = 0.8f), RoundedCornerShape(4.dp))
+                                .width(100.dp)
+                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                text = npc.name.uppercase(),
-                                fontSize = 6.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = BlueprintTextPrimary,
-                                maxLines = 1
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .background(npc.beltColor, RoundedCornerShape(2.dp))
-                                    .border(0.5.dp, Color.Gray.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
-                                    .padding(horizontal = 2.dp, vertical = 0.5.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = npc.belt.uppercase(),
-                                    fontSize = 4.5.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = npcBeltTextColor
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (isMuted) {
+                                        Text("🔇", fontSize = 6.sp)
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                    }
+                                    Text(
+                                        text = npc.name.uppercase(),
+                                        fontSize = 6.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isMuted) BlueprintTextSecondary else BlueprintTextPrimary,
+                                        maxLines = 1
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .background(npc.beltColor, RoundedCornerShape(2.dp))
+                                        .border(0.5.dp, Color.Gray.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
+                                        .padding(horizontal = 2.dp, vertical = 0.5.dp)
+                                ) {
+                                    Text(
+                                        text = npc.belt.uppercase(),
+                                        fontSize = 4.5.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = npcBeltTextColor
+                                    )
+                                }
                             }
                         }
-                    }
-
-                    // Speech bubble (if npc is talking / has text)
-                    if (npc.baseSpeechBubble.isNotEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .offset(x = xDp - 55.dp, y = yDp - 88.dp)
-                                .background(Color.White, RoundedCornerShape(6.dp))
-                                .border(1.dp, npc.beltColor, RoundedCornerShape(6.dp))
-                                .widthIn(max = 110.dp)
-                                .padding(horizontal = 6.dp, vertical = 4.dp)
-                        ) {
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(modifier = Modifier.size(4.dp).background(npc.beltColor, CircleShape))
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(npc.name, fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+    
+                        // Speech bubble (if npc is talking / has text and not muted)
+                        if (npc.baseSpeechBubble.isNotEmpty() && !isMuted) {
+                            Box(
+                                modifier = Modifier
+                                    .offset(x = xDp - 55.dp, y = yDp - 88.dp)
+                                    .background(Color.White, RoundedCornerShape(6.dp))
+                                    .border(1.dp, npc.beltColor, RoundedCornerShape(6.dp))
+                                    .widthIn(max = 110.dp)
+                                    .padding(horizontal = 6.dp, vertical = 4.dp)
+                            ) {
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(modifier = Modifier.size(4.dp).background(npc.beltColor, CircleShape))
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text(npc.name, fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                                    }
+                                    Text(npc.baseSpeechBubble, fontSize = 7.sp, color = Color(0xFF1E293B), lineHeight = 9.sp)
                                 }
-                                Text(npc.baseSpeechBubble, fontSize = 7.sp, color = Color(0xFF1E293B), lineHeight = 9.sp)
                             }
                         }
                     }
@@ -1491,26 +1580,277 @@ fun OverviewTab(
                         .padding(6.dp),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = "CHAT GLOBAL & LOGS",
-                        fontSize = 8.5.sp,
-                        fontWeight = FontWeight.Black,
-                        color = BlueprintCyan,
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
+                    // Chat Control Row (Channel Selection + Moderation Switch)
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "SISTEMA DE CHAT JIUVERSE",
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Black,
+                                color = BlueprintCyan,
+                                letterSpacing = 0.5.sp
+                            )
+                            
+                            // Safety Control Button
+                            Button(
+                                onClick = { isModerationPanelDialogVisible = !isModerationPanelDialogVisible },
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 1.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isModerationPanelDialogVisible) BlueprintOrange else Color(0xFF1E293B)
+                                ),
+                                shape = RoundedCornerShape(2.dp),
+                                modifier = Modifier.height(13.dp)
+                            ) {
+                                Text(
+                                    text = "🛡️ " + (if (isModerationPanelDialogVisible) "FECHAR MOD." else "SEGURANÇA"),
+                                    fontSize = 6.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                        
+                        // Channel Toggles Row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            listOf(
+                                "GLOBAL" to "🌍 GLOBAL", 
+                                "LOCAL" to "🔊 LOCAL", 
+                                "ACADEMIA" to "🥋 ACAD.", 
+                                "PRIVADO" to "🔒 PRIV."
+                            ).forEach { (chId, chLabel) ->
+                                val isActive = chatChannelSelected == chId
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(
+                                            if (isActive) BlueprintCyan.copy(alpha = 0.25f) else Color(0xFF1E293B),
+                                            RoundedCornerShape(3.dp)
+                                        )
+                                        .border(
+                                            0.5.dp, 
+                                            if (isActive) BlueprintCyan else Color.Transparent, 
+                                            RoundedCornerShape(3.dp)
+                                        )
+                                        .clickable { chatChannelSelected = chId }
+                                        .padding(vertical = 3.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = chLabel,
+                                        fontSize = 7.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isActive) BlueprintCyan else BlueprintTextSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
 
-                    // Text Scroller
-                    Box(modifier = Modifier.weight(1f)) {
+                    // Conditional Safety / Moderation Panel (Silenciar & Bloquear Jogador)
+                    if (isModerationPanelDialogVisible) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                            border = BorderStroke(0.5.dp, BlueprintOrange.copy(alpha = 0.5f))
+                        ) {
+                            Column(modifier = Modifier.padding(4.dp)) {
+                                Text(
+                                    text = "PAINEL DE SEGURANÇA E MODERAÇÃO (ANTI-FLOOD ATIVO)",
+                                    fontSize = 7.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = BlueprintOrange
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                
+                                // Listed users for rapid toggle Actions
+                                val listableUsers = listOf("Laura", "Guilherme", "Dragão Negro")
+                                listableUsers.forEach { targetUser ->
+                                    val isMuted = mutedPlayersList.contains(targetUser)
+                                    val isBlocked = blockedPlayersList.contains(targetUser)
+                                    
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 1.6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "@$targetUser",
+                                            fontSize = 7.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = BlueprintTextPrimary
+                                        )
+                                        
+                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            // Silenciar / Mute Toggle
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(
+                                                        if (isMuted) BlueprintOrange.copy(alpha = 0.3f) else Color.DarkGray,
+                                                        RoundedCornerShape(2.dp)
+                                                    )
+                                                    .clickable {
+                                                        if (isMuted) {
+                                                            mutedPlayersList.remove(targetUser)
+                                                            gameEvents.add(0, "🔊 [MODERAÇÃO] @$targetUser foi desmutado.")
+                                                        } else {
+                                                            mutedPlayersList.add(targetUser)
+                                                            gameEvents.add(0, "🔇 [MODERAÇÃO] @$targetUser silenciado com sucesso. Mensagens ocultas!")
+                                                        }
+                                                    }
+                                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (isMuted) "🔇 SILENCIADO" else "🔈 SILENCIAR",
+                                                    fontSize = 6.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isMuted) BlueprintOrange else Color.LightGray
+                                                )
+                                            }
+                                            
+                                            // Bloquear / Block Toggle
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(
+                                                        if (isBlocked) Color.Red.copy(alpha = 0.3f) else Color.DarkGray,
+                                                        RoundedCornerShape(2.dp)
+                                                    )
+                                                    .clickable {
+                                                        if (isBlocked) {
+                                                            blockedPlayersList.remove(targetUser)
+                                                            gameEvents.add(0, "🔔 [MODERAÇÃO] @$targetUser foi desbloqueado.")
+                                                        } else {
+                                                            blockedPlayersList.add(targetUser)
+                                                            gameEvents.add(0, "🚫 [MODERAÇÃO] @$targetUser BLOQUEADO! Avatar ocultado da praça.")
+                                                        }
+                                                    }
+                                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (isBlocked) "🚫 BLOQUEADO" else "⚔️ BLOQUEAR",
+                                                    fontSize = 6.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isBlocked) Color.Red else Color.LightGray
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // WHISPER RECIPIENT SELECTOR
+                    if (chatChannelSelected == "PRIVADO") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF1E293B), RoundedCornerShape(3.dp))
+                                .padding(vertical = 2.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text("Para:", fontSize = 7.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            listOf("Laura", "Guilherme", "Dragão Negro").forEach { target ->
+                                val isSelected = whisperRecipientByName == target
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            if (isSelected) Color(0xFFEC4899).copy(alpha = 0.25f) else Color.Transparent,
+                                            RoundedCornerShape(2.dp)
+                                        )
+                                        .border(
+                                            0.5.dp,
+                                            if (isSelected) Color(0xFFEC4899) else Color.Gray.copy(alpha = 0.4f),
+                                            RoundedCornerShape(2.dp)
+                                        )
+                                        .clickable { whisperRecipientByName = target }
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = "@$target",
+                                        fontSize = 6.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color(0xFFEC4899) else Color.LightGray
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Dynamic search filter
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 1.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "🔍 Filtrar:",
+                            fontSize = 7.sp,
+                            color = BlueprintTextSecondary
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        BasicTextField(
+                            value = chatFilterTextKeyword,
+                            onValueChange = { chatFilterTextKeyword = it },
+                            textStyle = TextStyle(color = Color.White, fontSize = 7.5.sp, fontFamily = FontFamily.Monospace),
+                            singleLine = true,
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(Color(0xFF1E293B), RoundedCornerShape(2.dp))
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                        )
+                        if (chatFilterTextKeyword.isNotEmpty()) {
+                            Text(
+                                text = "Limpar",
+                                fontSize = 7.sp,
+                                color = BlueprintCyan,
+                                modifier = Modifier
+                                    .padding(start = 3.dp)
+                                    .clickable { chatFilterTextKeyword = "" }
+                            )
+                        }
+                    }
+
+                    // Text Scroller / Log Stream
+                    Box(modifier = Modifier.weight(1f).padding(top = 4.dp)) {
+                        val filteredEvents = gameEvents.filter {
+                            chatFilterTextKeyword.isEmpty() || it.contains(chatFilterTextKeyword, ignoreCase = true)
+                        }
+                        
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            items(gameEvents) { msg ->
+                            items(filteredEvents) { msg ->
+                                // Determine the appropriate accent color index for readability
+                                val textColor = when {
+                                    msg.startsWith("🔊 [LOCAL]") -> BlueprintTeal
+                                    msg.startsWith("🌍 [GLOBAL]") -> BlueprintCyan
+                                    msg.startsWith("🥋 [ACADEMIA]") -> Color(0xFFC084FC)
+                                    msg.startsWith("🔒 [PRIVADO]") || msg.contains("Sussurrando") || msg.contains("sussurra") || msg.contains("responde") || msg.contains("sussuro") -> Color(0xFFEC4899)
+                                    msg.startsWith("⚠️ [MODERAÇÃO]") || msg.startsWith("🔇 [MODERAÇÃO]") || msg.startsWith("🚫 [MODERAÇÃO]") -> BlueprintOrange
+                                    msg.contains("SISTEMA") || msg.contains("SENSEI") -> BlueprintTeal
+                                    else -> BlueprintTextSecondary
+                                }
+                                
                                 Text(
                                     text = msg,
                                     fontSize = 8.5.sp,
-                                    color = if (msg.contains("CHAT")) BlueprintCyan else if (msg.contains("SENSEI") || msg.contains("SISTEMA")) BlueprintTeal else BlueprintTextSecondary,
+                                    color = textColor,
                                     fontFamily = FontFamily.Monospace,
                                     lineHeight = 11.sp
                                 )
@@ -1544,9 +1884,71 @@ fun OverviewTab(
                             ),
                             keyboardActions = KeyboardActions(
                                 onSend = {
-                                    if (textMessageInput.trim().isNotEmpty()) {
-                                        activeBubbleText = textMessageInput
-                                        gameEvents.add(0, "💬 CHAT ${memory.playerName.uppercase()}: \"$textMessageInput\"")
+                                    val trimmedMsg = textMessageInput.trim()
+                                    if (trimmedMsg.isNotEmpty()) {
+                                        val now = System.currentTimeMillis()
+                                        // Anti-spam warning (rate limiter 1.5s)
+                                        if (now - lastChatMessageSentTimestamp < 1500L) {
+                                            gameEvents.add(0, "⚠️ [MODERAÇÃO] Anti-Flood: Aguarde 1.5s antes de enviar outra mensagem!")
+                                        } else {
+                                            lastChatMessageSentTimestamp = now
+                                            
+                                            // Process based on selected channel
+                                            when (chatChannelSelected) {
+                                                "LOCAL" -> {
+                                                    activeBubbleText = trimmedMsg
+                                                    val finalMsg = "🔊 [LOCAL] @${memory.playerName}: \"$trimmedMsg\""
+                                                    gameEvents.add(0, finalMsg)
+                                                    
+                                                    // Trigger Proximity Chat replies from nearby characters
+                                                    npcs.forEach { npc ->
+                                                        val isBlocked = blockedPlayersList.contains(npc.name)
+                                                        val isMuted = mutedPlayersList.contains(npc.name)
+                                                        if (!isBlocked && !isMuted) {
+                                                            val xDiff = playerGridX - npc.currentGridX
+                                                            val yDiff = playerGridY - npc.currentGridY
+                                                            val distance = kotlin.math.sqrt(xDiff * xDiff + yDiff * yDiff)
+                                                            if (distance <= 3.5f) {
+                                                                // Dynamic nearby reaction
+                                                                val reactions = listOf(
+                                                                    "Tô por aqui conversando!",
+                                                                    "Oss! Ouvi seu papo aqui por perto.",
+                                                                    "Boa @${memory.playerName}! Vamos treinar no tatame?",
+                                                                    "Entendi tudo perfeitamente!"
+                                                                )
+                                                                npc.baseSpeechBubble = reactions.random()
+                                                                gameEvents.add(
+                                                                    0,
+                                                                    "🔊 [LOCAL] @${npc.name}: \"${npc.baseSpeechBubble}\" (A ${String.format("%.1f", distance)} unidades de distância)"
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                "GLOBAL" -> {
+                                                    activeBubbleText = trimmedMsg
+                                                    gameEvents.add(0, "🌍 [GLOBAL] @${memory.playerName}: \"$trimmedMsg\"")
+                                                }
+                                                "ACADEMIA" -> {
+                                                    activeBubbleText = trimmedMsg
+                                                    gameEvents.add(0, "🥋 [ACADEMIA] @${memory.playerName}: \"$trimmedMsg\"")
+                                                }
+                                                "PRIVADO" -> {
+                                                    // Sussurro / Private Message
+                                                    gameEvents.add(0, "🔒 [PRIVADO] Sussurrando para @$whisperRecipientByName: \"$trimmedMsg\"")
+                                                    
+                                                    // Simulated recipient response to private whisper
+                                                    val isBlocked = blockedPlayersList.contains(whisperRecipientByName)
+                                                    val isMuted = mutedPlayersList.contains(whisperRecipientByName)
+                                                    if (!isBlocked && !isMuted) {
+                                                        gameEvents.add(
+                                                            0,
+                                                            "🔒 [PRIVADO] @$whisperRecipientByName sussurra de volta: \"Foco no foco! Oss! Recebi seu sussurro privado!\""
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
                                         textMessageInput = ""
                                     }
                                 }
@@ -1559,9 +1961,71 @@ fun OverviewTab(
                             modifier = Modifier
                                 .size(14.dp)
                                 .clickable {
-                                    if (textMessageInput.trim().isNotEmpty()) {
-                                        activeBubbleText = textMessageInput
-                                        gameEvents.add(0, "💬 CHAT ${memory.playerName.uppercase()}: \"$textMessageInput\"")
+                                    val trimmedMsg = textMessageInput.trim()
+                                    if (trimmedMsg.isNotEmpty()) {
+                                        val now = System.currentTimeMillis()
+                                        // Anti-spam warning (rate limiter 1.5s)
+                                        if (now - lastChatMessageSentTimestamp < 1500L) {
+                                            gameEvents.add(0, "⚠️ [MODERAÇÃO] Anti-Flood: Aguarde 1.5s antes de enviar outra mensagem!")
+                                        } else {
+                                            lastChatMessageSentTimestamp = now
+                                            
+                                            // Process based on selected channel
+                                            when (chatChannelSelected) {
+                                                "LOCAL" -> {
+                                                    activeBubbleText = trimmedMsg
+                                                    val finalMsg = "🔊 [LOCAL] @${memory.playerName}: \"$trimmedMsg\""
+                                                    gameEvents.add(0, finalMsg)
+                                                    
+                                                    // Trigger Proximity Chat replies from nearby characters
+                                                    npcs.forEach { npc ->
+                                                        val isBlocked = blockedPlayersList.contains(npc.name)
+                                                        val isMuted = mutedPlayersList.contains(npc.name)
+                                                        if (!isBlocked && !isMuted) {
+                                                            val xDiff = playerGridX - npc.currentGridX
+                                                            val yDiff = playerGridY - npc.currentGridY
+                                                            val distance = kotlin.math.sqrt(xDiff * xDiff + yDiff * yDiff)
+                                                            if (distance <= 3.5f) {
+                                                                // Dynamic nearby reaction
+                                                                val reactions = listOf(
+                                                                    "Tô por aqui conversando!",
+                                                                    "Oss! Ouvi seu papo aqui por perto.",
+                                                                    "Boa @${memory.playerName}! Vamos treinar no tatame?",
+                                                                    "Entendi tudo perfeitamente!"
+                                                                )
+                                                                npc.baseSpeechBubble = reactions.random()
+                                                                gameEvents.add(
+                                                                    0,
+                                                                    "🔊 [LOCAL] @${npc.name}: \"${npc.baseSpeechBubble}\" (A ${String.format("%.1f", distance)} unidades de distância)"
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                "GLOBAL" -> {
+                                                    activeBubbleText = trimmedMsg
+                                                    gameEvents.add(0, "🌍 [GLOBAL] @${memory.playerName}: \"$trimmedMsg\"")
+                                                }
+                                                "ACADEMIA" -> {
+                                                    activeBubbleText = trimmedMsg
+                                                    gameEvents.add(0, "🥋 [ACADEMIA] @${memory.playerName}: \"$trimmedMsg\"")
+                                                }
+                                                "PRIVADO" -> {
+                                                    // Sussurro / Private Message
+                                                    gameEvents.add(0, "🔒 [PRIVADO] Sussurrando para @$whisperRecipientByName: \"$trimmedMsg\"")
+                                                    
+                                                    // Simulated recipient response to private whisper
+                                                    val isBlocked = blockedPlayersList.contains(whisperRecipientByName)
+                                                    val isMuted = mutedPlayersList.contains(whisperRecipientByName)
+                                                    if (!isBlocked && !isMuted) {
+                                                        gameEvents.add(
+                                                            0,
+                                                            "🔒 [PRIVADO] @$whisperRecipientByName sussurra de volta: \"Foco no foco! Oss! Recebi seu sussurro privado!\""
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
                                         textMessageInput = ""
                                     }
                                 }
@@ -1572,7 +2036,7 @@ fun OverviewTab(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // ONLINE FRIENDS LIST (Exactly matching mockup right-side layout)
+            // ================= PRESENÇA ONLINE EM TEMPO REAL (Socket.IO) =================
             Card(
                 modifier = Modifier
                     .weight(1f)
@@ -1585,62 +2049,341 @@ fun OverviewTab(
                         .fillMaxSize()
                         .padding(6.dp)
                 ) {
-                    Text(
-                        text = "AMIGOS ONLINE (3)",
-                        fontSize = 8.5.sp,
-                        fontWeight = FontWeight.Black,
-                        color = BlueprintTextPrimary
-                    )
+                    // Socket.IO Status Header Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "JOGADORES ONLINE (Socket.IO)",
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Black,
+                                color = BlueprintTextPrimary
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(4.dp)
+                                        .background(if (socketConnectionStatus == "Conectado") BlueprintGreen else BlueprintOrange, CircleShape)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = "Socket.IO • ${socketConnectionPing}ms (${socketConnectionStatus.uppercase()})",
+                                    fontSize = 6.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (socketConnectionStatus == "Conectado") BlueprintGreen else BlueprintOrange
+                                )
+                            }
+                        }
+                        
+                        // Toggle Simulation Button
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    if (isPresenceSimulationActive) BlueprintTeal.copy(alpha = 0.2f) else Color.DarkGray,
+                                    RoundedCornerShape(2.dp)
+                                )
+                                .border(0.5.dp, if (isPresenceSimulationActive) BlueprintTeal else Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
+                                .clickable {
+                                    isPresenceSimulationActive = !isPresenceSimulationActive
+                                    gameEvents.add(
+                                        0,
+                                        if (isPresenceSimulationActive) "📶 [SOCKET.IO] Rede ativa: Iniciando escuta de presença em tempo real (Port 9091)..."
+                                        else "📶 [SOCKET.IO] Rede pausada: Clientes congelados sob escuta offline."
+                                    )
+                                }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = if (isPresenceSimulationActive) "📶 SIM ATIVO" else "⏹️ PARADO",
+                                fontSize = 6.sp,
+                                fontWeight = FontWeight.Black,
+                                color = if (isPresenceSimulationActive) BlueprintTeal else Color.LightGray
+                            )
+                        }
+                    }
+                    
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         items(npcs) { buddy ->
-                            Row(
+                            val isExpanded = expandedPlayerName == buddy.name
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .background(BlueprintCard, RoundedCornerShape(4.dp))
-                                    .clip(RoundedCornerShape(4.dp))
+                                    .border(
+                                        0.5.dp, 
+                                        if (isExpanded) BlueprintCyan.copy(alpha = 0.6f) else Color.Transparent, 
+                                        RoundedCornerShape(4.dp)
+                                    )
                                     .clickable {
-                                        activeBubbleText = "Ei ${buddy.name}! Vamos treinar?"
-                                        gameEvents.add(0, "🔔 [SISTEMA] Conectou sussurro privado com ${buddy.handle}")
+                                        expandedPlayerName = if (isExpanded) null else buddy.name
                                     }
-                                    .padding(4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(4.dp)
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(16.dp)
-                                            .background(buddy.beltColor, CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("🥋", fontSize = 9.sp)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        // Stylized Belt Circular Avatar
+                                        Box(
+                                            modifier = Modifier
+                                                .size(20.dp)
+                                                .background(buddy.beltColor, CircleShape)
+                                                .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = if (buddy.name.isNotEmpty()) buddy.name.take(1).uppercase() else "🥋",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = if (buddy.beltColor == Color.Black) Color.White else Color.Black
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Column {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = buddy.name,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = BlueprintTextPrimary
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Box(
+                                                    modifier = Modifier
+                                                        .background(Color(0xFF1E293B), RoundedCornerShape(2.dp))
+                                                        .padding(horizontal = 3.dp, vertical = 0.5.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "NV ${buddy.level}",
+                                                        fontSize = 6.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = BlueprintCyan
+                                                    )
+                                                }
+                                                if (buddy.isFriend) {
+                                                    Spacer(modifier = Modifier.width(3.dp))
+                                                    Text("⭐", fontSize = 6.sp)
+                                                }
+                                            }
+                                            Text(
+                                                text = buddy.handle,
+                                                fontSize = 7.sp,
+                                                color = BlueprintTextSecondary
+                                            )
+                                        }
                                     }
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Column {
-                                        Text(
-                                            text = buddy.name,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = BlueprintTextPrimary
+
+                                    // Online Presence Indicators using Socket.IO Status
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(5.dp)
+                                                .background(if (buddy.isOnline) BlueprintGreen else Color.Gray, CircleShape)
                                         )
+                                        Spacer(modifier = Modifier.width(3.dp))
                                         Text(
-                                            text = buddy.handle,
-                                            fontSize = 7.sp,
-                                            color = BlueprintTextSecondary
+                                            text = if (buddy.isOnline) buddy.statusText.uppercase() else "OFFLINE",
+                                            fontSize = 6.5.sp,
+                                            color = if (buddy.isOnline) BlueprintGreen else Color.LightGray,
+                                            fontWeight = FontWeight.Bold
                                         )
                                     }
                                 }
 
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
+                                // Interactive Actions Deck
+                                AnimatedVisibility(
+                                    visible = isExpanded,
+                                    enter = expandVertically() + fadeIn(),
+                                    exit = shrinkVertically() + fadeOut()
+                                ) {
+                                    Column(
                                         modifier = Modifier
-                                            .size(5.dp)
-                                            .background(BlueprintGreen, CircleShape)
-                                    )
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text("ONLINE", fontSize = 6.5.sp, color = BlueprintGreen, fontWeight = FontWeight.Bold)
+                                            .fillMaxWidth()
+                                            .padding(top = 4.dp)
+                                            .background(Color(0xFF0F172A).copy(alpha = 0.5f), RoundedCornerShape(2.dp))
+                                            .padding(4.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                        ) {
+                                            // 1. ADICIONAR AMIGO
+                                            Button(
+                                                onClick = {
+                                                    val index = npcs.indexOf(buddy)
+                                                    if (index != -1) {
+                                                        npcs[index] = buddy.copy(isFriend = !buddy.isFriend)
+                                                        gameEvents.add(
+                                                            0,
+                                                            if (!buddy.isFriend) "🤝 [SOCKET.IO] Evento 'friend_request' emitido: { target: \"${buddy.handle}\", isFriend: true } — Vínculo de amizade ativado!"
+                                                            else "🤝 [SOCKET.IO] Amizade desfeita com ${buddy.name}."
+                                                        )
+                                                    }
+                                                },
+                                                modifier = Modifier.weight(1f).height(18.dp),
+                                                contentPadding = PaddingValues(horizontal = 2.dp),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = if (buddy.isFriend) BlueprintOrange.copy(alpha = 0.4f) else Color(0xFF1E293B)
+                                                ),
+                                                shape = RoundedCornerShape(2.dp)
+                                            ) {
+                                                Row(
+                                                    horizontalArrangement = Arrangement.Center,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Person, 
+                                                        contentDescription = null, 
+                                                        tint = if (buddy.isFriend) BlueprintOrange else Color.LightGray,
+                                                        modifier = Modifier.size(8.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(2.dp))
+                                                    Text(
+                                                        text = if (buddy.isFriend) "AMIGO ✓" else "ADD AMIGO",
+                                                        fontSize = 6.5.sp,
+                                                        color = Color.White,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+
+                                            // 2. ENVIAR MENSAGEM
+                                            Button(
+                                                onClick = {
+                                                    chatChannelSelected = "PRIVADO"
+                                                    whisperRecipientByName = buddy.name
+                                                    gameEvents.add(
+                                                        0,
+                                                        "💬 [SOCKET.IO] Canal privado Socket sincronizado com ${buddy.handle}. Digite sua mensagem em sussurro!"
+                                                    )
+                                                },
+                                                modifier = Modifier.weight(1f).height(18.dp),
+                                                contentPadding = PaddingValues(horizontal = 2.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                                                shape = RoundedCornerShape(2.dp)
+                                            ) {
+                                                Row(
+                                                    horizontalArrangement = Arrangement.Center,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Send, 
+                                                        contentDescription = null, 
+                                                        tint = BlueprintCyan,
+                                                        modifier = Modifier.size(8.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(2.dp))
+                                                    Text(
+                                                        text = "COCHICHAR",
+                                                        fontSize = 6.5.sp,
+                                                        color = Color.White,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(3.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                        ) {
+                                            // 3. VISITAR ACADEMIA
+                                            Button(
+                                                onClick = {
+                                                    if (buddy.isOnline) {
+                                                        // Teleport near the buddy
+                                                        targetGridX = buddy.currentGridX + 0.5f
+                                                        targetGridY = buddy.currentGridY - 0.5f
+                                                        activeEmoteParticleCoord = Pair(buddy.currentGridX, buddy.currentGridY)
+                                                        activeEmoteParticleText = "⚡ VIAJANDO..."
+                                                        
+                                                        gameEvents.add(
+                                                            0,
+                                                            "🥋 [SOCKET.IO] Teleportando ao Dojo filiado de ${buddy.handle}... Coordenadas de tatame sincronizadas!"
+                                                        )
+                                                    } else {
+                                                        gameEvents.add(0, "⚠️ [SOCKET.IO] Jogador offline: Não é possível visitar a academia agora.")
+                                                    }
+                                                },
+                                                modifier = Modifier.weight(1f).height(18.dp),
+                                                contentPadding = PaddingValues(horizontal = 2.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                                                shape = RoundedCornerShape(2.dp)
+                                            ) {
+                                                Row(
+                                                    horizontalArrangement = Arrangement.Center,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Home, 
+                                                        contentDescription = null, 
+                                                        tint = BlueprintTeal,
+                                                        modifier = Modifier.size(8.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(2.dp))
+                                                    Text(
+                                                        text = "VISITAR COCH",
+                                                        fontSize = 6.5.sp,
+                                                        color = Color.White,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+
+                                            // 4. DESAFIAR JOGADOR
+                                            Button(
+                                                onClick = {
+                                                    if (buddy.isOnline) {
+                                                        gameEvents.add(0, "⚔️ [SOCKET.IO] Desafio em tempo real emitido: socket.emit(\"pvp_challenge\", { opponent: \"${buddy.name}\" })")
+                                                        val index = npcs.indexOf(buddy)
+                                                        if (index != -1) {
+                                                            npcs[index] = buddy.copy(statusText = "🥊 Desafiado")
+                                                        }
+                                                        
+                                                        // Auto trigger aceitação response from server in 1.2s
+                                                        gameEvents.add(0, "🥊 [SOCKET.IO] ${buddy.name} está analisando os termos de combate virtual...")
+                                                    } else {
+                                                        gameEvents.add(0, "⚠️ [SOCKET.IO] Jogador offline: Impossível desafiar para combate!")
+                                                    }
+                                                },
+                                                modifier = Modifier.weight(1f).height(18.dp),
+                                                contentPadding = PaddingValues(horizontal = 2.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                                                shape = RoundedCornerShape(2.dp)
+                                            ) {
+                                                Row(
+                                                    horizontalArrangement = Arrangement.Center,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.PlayArrow, 
+                                                        contentDescription = null, 
+                                                        tint = BlueprintRed,
+                                                        modifier = Modifier.size(8.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(2.dp))
+                                                    Text(
+                                                        text = "DESAFIAR",
+                                                        fontSize = 6.5.sp,
+                                                        color = Color.White,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
