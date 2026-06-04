@@ -1,0 +1,6 @@
+{
+  "name": "JiuVerse Blueprint",
+  "description": "O guia arquitetônico completo para o MMORPG JiuVerse, incluindo diagramas interativos, modelagem de banco de dados, calculadora de escalabilidade para 100k usuários, sandbox anti-trapaça e assistente de IA.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
