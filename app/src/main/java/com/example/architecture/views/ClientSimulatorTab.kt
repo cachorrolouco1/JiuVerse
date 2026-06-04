@@ -69,6 +69,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.architecture.viewmodel.ArchitectureViewModel
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.compose.ui.viewinterop.AndroidView
 import com.example.ui.theme.BlueprintBg
 import com.example.ui.theme.BlueprintCard
 import com.example.ui.theme.BlueprintCyan
@@ -360,9 +364,15 @@ fun ClientSimulatorTab(
                                 phoneTextSecondary = phoneTextSecondary,
                                 playerX = playerX,
                                 playerY = playerY,
+                                userNickname = userNickname,
+                                userBelt = userBelt,
                                 onMove = { dx, dy ->
                                     playerX = (playerX + dx).coerceIn(0, 6)
                                     playerY = (playerY + dy).coerceIn(0, 6)
+                                },
+                                onCoordsChange = { x, y ->
+                                    playerX = x
+                                    playerY = y
                                 }
                             )
                             "inventory" -> SimInventoryScreen(
@@ -631,17 +641,22 @@ fun SimHomeScreen(
     phoneTextSecondary: Color,
     playerX: Int,
     playerY: Int,
-    onMove: (Int, Int) -> Unit
+    userNickname: String,
+    userBelt: String,
+    onMove: (Int, Int) -> Unit,
+    onCoordsChange: (Int, Int) -> Unit
 ) {
     var selectedChannel by remember { mutableStateOf("Central") } // Central, Premium, Privado
     var proxFilter by remember { mutableStateOf(true) }
+    var useWebPhaser by remember { mutableStateOf(false) }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(8.dp)
     ) {
-        // Network Status
+        // Network Status Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -651,7 +666,12 @@ fun SimHomeScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("TATAME ISOMÉTRICO (PHASER)", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color(0xFF06B6D4))
+                Text(
+                    text = if (useWebPhaser) "PHASER 3 ENGINE (ATIVO)" else "TATAME ISOMÉTRICO (SIMULADO)",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFF06B6D4)
+                )
                 Text("Dojo $selectedChannel • ($playerX, $playerY)", fontSize = 8.sp, color = phoneTextSecondary)
             }
             Box(
@@ -660,7 +680,53 @@ fun SimHomeScreen(
                     .border(0.5.dp, Color(0xFF14B8A6), RoundedCornerShape(4.dp))
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
-                Text("60 FPS", fontSize = 7.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2DD4BF))
+                Text(
+                    text = if (useWebPhaser) "WEBVIEW" else "60 FPS",
+                    fontSize = 7.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF2DD4BF)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Dynamic Engine Selector (Aesthetic design tab row)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF020617), RoundedCornerShape(6.dp))
+                .padding(2.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(if (!useWebPhaser) Color(0xFF1E293B) else Color.Transparent, RoundedCornerShape(4.dp))
+                    .clickable { useWebPhaser = false }
+                    .padding(vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "🕹️ SIM COMPOSER",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (!useWebPhaser) Color(0xFF14B8A6) else phoneTextSecondary
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(if (useWebPhaser) Color(0xFF1E293B) else Color.Transparent, RoundedCornerShape(4.dp))
+                    .clickable { useWebPhaser = true }
+                    .padding(vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "🎮 PHASER 3 LIVE",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (useWebPhaser) Color(0xFF14B8A6) else phoneTextSecondary
+                )
             }
         }
 
@@ -694,7 +760,7 @@ fun SimHomeScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         // Dynamic 2.5D Isometric Render Canvas Box
         Box(
@@ -706,68 +772,363 @@ fun SimHomeScreen(
                 .padding(4.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Isometric perspective simulated layout
-            Box(
-                modifier = Modifier
-                    .width(180.dp)
-                    .height(180.dp)
-            ) {
-                val tWidth = 26f
-                val tHeight = 13f
-                val originX = 75f // offset centering
-                val originY = 20f
+            if (useWebPhaser) {
+                AndroidView(
+                    factory = { ctx ->
+                        WebView(ctx).apply {
+                            webViewClient = WebViewClient()
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            settings.useWideViewPort = true
+                            settings.loadWithOverviewMode = true
+                            
+                            addJavascriptInterface(object : Any() {
+                                @JavascriptInterface
+                                fun postMessage(message: String) {
+                                    try {
+                                        val json = org.json.JSONObject(message)
+                                        val type = json.optString("type")
+                                        if (type == "PLAYER_MOVE") {
+                                            val x = json.optInt("x")
+                                            val y = json.optInt("y")
+                                            onCoordsChange(x, y)
+                                        }
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                    }
+                                }
+                            }, "AndroidWebView")
 
-                // Draw Tatami Tiles matching isometric projection
-                for (r in 0..4) {
-                    for (c in 0..4) {
-                        val isoX = originX + (c - r) * (tWidth / 2f)
-                        val isoY = originY + (c + r) * (tHeight / 2f)
+                            val html = """
+                                <!DOCTYPE html>
+                                <html>
+                                <head>
+                                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+                                    <style>
+                                        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #020617; font-family: monospace; }
+                                        #game-container { width: 100%; height: 100%; position: absolute; top:0; left:0; }
+                                        #diagnostic-hud {
+                                            position: absolute; top: 6px; left: 6px; background: rgba(9, 13, 22, 0.95);
+                                            border: 1px solid #06b6d4; padding: 5px; border-radius: 4px; color: #f8fafc;
+                                            font-size: 7.5px; pointer-events: none; z-index: 100; max-width: 160px;
+                                            box-shadow: 0 0 5px rgba(6, 182, 212, 0.3);
+                                        }
+                                        .hud-line { margin-bottom: 2px; }
+                                    </style>
+                                    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+                                </head>
+                                <body>
+                                    <div id="diagnostic-hud">
+                                        <div class="hud-line" style="color: #2dd4bf; font-weight: bold;">PHASER ENGINE v3.60</div>
+                                        <div class="hud-line">Status: <span style="color: #10b981; font-weight: bold;">ONLINE (SYNC)</span></div>
+                                        <div class="hud-line">Coords: <span style="color: #38bdf8;" id="val-coords">($playerX, $playerY)</span></div>
+                                        <div class="hud-line">FPS: <span id="val-fps">60</span></div>
+                                    </div>
+                                    <div id="game-container"></div>
 
-                        val isPlayer = playerX == c && playerY == r
-                        val isBot = (c == 1 && r == 3) || (c == 3 && r == 1)
-                        val isBlocked = c == 0 || r == 0 || c == 4 || r == 4
+                                    <script>
+                                        const TILE_WIDTH = 44;
+                                        const TILE_HEIGHT = 22;
+                                        const MAP_OFFSET_X = 135;
+                                        const MAP_OFFSET_Y = 48;
+                                        const GRID_SIZE = 7;
 
-                        // Render each tile offset dynamically
-                        Box(
-                            modifier = Modifier
-                                .size(width = tWidth.dp, height = (tHeight + 2).dp)
-                                .offset(x = isoX.dp, y = isoY.dp)
-                                .background(
-                                    color = if (isBlocked) Color(0xFF7F1D1D)
-                                            else if (isPlayer) Color(0xFF1D4ED8)
-                                            else if (isBot) Color(0xFF5B21B6)
-                                            else if ((r + c) % 2 == 0) Color(0xFF0F172A)
-                                            else Color(0xFF1E293B),
-                                    shape = RoundedCornerShape(2.dp)
-                                )
-                                .border(0.5.dp, if (isBlocked) Color(0xFFB91C1C) else Color(0xFF334155), RoundedCornerShape(2.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (isPlayer) {
-                                Text(
-                                    "🥋", 
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.offset(y = (-6).dp)
-                                )
-                            }
-                            if (isBot) {
-                                Text(
-                                    "👤", 
-                                    fontSize = 9.sp,
-                                    color = Color.White,
-                                    modifier = Modifier.offset(y = (-4).dp)
-                                )
-                                
-                                // Speech/Proximity bubble simulation for nearby players
-                                val dist = Math.abs(playerX - c) + Math.abs(playerY - r)
-                                if (dist <= 2 && proxFilter) {
-                                    Box(
-                                        modifier = Modifier
-                                            .background(Color(0xFF10B981), RoundedCornerShape(3.dp))
-                                            .padding(horizontal = 3.dp, vertical = 1.dp)
-                                            .offset(y = (-12).dp)
-                                    ) {
-                                        Text("OSS?", fontSize = 6.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                                        function cartToIso(x, y) {
+                                            return {
+                                                x: (x - y) * (TILE_WIDTH / 2) + MAP_OFFSET_X,
+                                                y: (x + y) * (TILE_HEIGHT / 2) + MAP_OFFSET_Y
+                                            };
+                                        }
+
+                                        class JiuVerseIsometricDojo extends Phaser.Scene {
+                                            constructor() {
+                                                super({ key: 'JiuVerseDojo' });
+                                                this.localPlayer = null;
+                                                this.otherPlayers = {};
+                                                this.collisionGrid = [];
+                                            }
+
+                                            preload() {
+                                                // Base ground tile
+                                                let canvas = this.textures.createCanvas('tile_base', TILE_WIDTH, TILE_HEIGHT);
+                                                let ctx = canvas.context;
+                                                ctx.fillStyle = '#0f172a';
+                                                ctx.lineWidth = 1;
+                                                ctx.strokeStyle = '#334155';
+                                                ctx.beginPath();
+                                                ctx.moveTo(TILE_WIDTH / 2, 0);
+                                                ctx.lineTo(TILE_WIDTH, TILE_HEIGHT / 2);
+                                                ctx.lineTo(TILE_WIDTH / 2, TILE_HEIGHT);
+                                                ctx.lineTo(0, TILE_HEIGHT / 2);
+                                                ctx.closePath();
+                                                ctx.fill();
+                                                ctx.stroke();
+                                                canvas.refresh();
+
+                                                // Alternative ground color tile
+                                                let activeCanvas = this.textures.createCanvas('tile_active', TILE_WIDTH, TILE_HEIGHT);
+                                                let actx = activeCanvas.context;
+                                                actx.fillStyle = '#1e293b';
+                                                actx.lineWidth = 1;
+                                                actx.strokeStyle = '#06b6d4';
+                                                actx.beginPath();
+                                                actx.moveTo(TILE_WIDTH / 2, 0);
+                                                actx.lineTo(TILE_WIDTH, TILE_HEIGHT / 2);
+                                                actx.lineTo(TILE_WIDTH / 2, TILE_HEIGHT);
+                                                actx.lineTo(0, TILE_HEIGHT / 2);
+                                                actx.closePath();
+                                                actx.fill();
+                                                actx.stroke();
+                                                activeCanvas.refresh();
+
+                                                // Procedural Character
+                                                let avatar = this.textures.createCanvas('char_front', 32, 48);
+                                                let avCtx = avatar.context;
+                                                avCtx.fillStyle = '#1d4ed8'; // Kimono azul marinho
+                                                avCtx.fillRect(6, 16, 20, 32);
+                                                avCtx.fillStyle = '#000000'; // Faixa preta
+                                                avCtx.fillRect(4, 28, 24, 4);
+                                                avCtx.fillStyle = '#ffffff';
+                                                avCtx.fillRect(18, 28, 4, 4);
+                                                avCtx.fillStyle = '#fbcfe8'; // Rostinho
+                                                avCtx.beginPath();
+                                                avCtx.arc(16, 10, 8, 0, Math.PI * 2);
+                                                avCtx.fill();
+                                                avatar.refresh();
+                                            }
+
+                                            create() {
+                                                this.cameras.main.setBackgroundColor('#020617');
+
+                                                // Construct grid blocks
+                                                for (let x = 0; x < GRID_SIZE; x++) {
+                                                    this.collisionGrid[x] = [];
+                                                    for (let y = 0; y < GRID_SIZE; y++) {
+                                                        let isBlocked = x === 0 || y === 0 || x === GRID_SIZE - 1 || y === GRID_SIZE - 1;
+                                                        this.collisionGrid[x][y] = isBlocked;
+
+                                                        let pos = cartToIso(x, y);
+                                                        let key = (x + y) % 2 === 0 ? 'tile_base' : 'tile_active';
+                                                        let tile = this.add.image(pos.x, pos.y, key);
+                                                        if (isBlocked) {
+                                                            tile.setTint(0x7f1d1d);
+                                                        }
+                                                    }
+                                                }
+
+                                                // Load local fighter avatar
+                                                let pPos = cartToIso($playerX, $playerY);
+                                                this.localPlayer = this.add.container(pPos.x, pPos.y);
+                                                let sprite = this.add.image(0, -20, 'char_front');
+
+                                                let nickStr = "$userNickname" ? "$userNickname" : "Fighter";
+                                                let tagText = this.add.text(0, -48, nickStr, {
+                                                    fontSize: '8.5px',
+                                                    fontFamily: 'monospace',
+                                                    backgroundColor: 'rgba(9, 13, 22, 0.9)',
+                                                    padding: { x: 3, y: 1 },
+                                                    color: '#2dd4bf',
+                                                    stroke: '#0891b2',
+                                                    strokeThickness: 1
+                                                }).setOrigin(0.5);
+
+                                                let bStr = "$userBelt" ? "$userBelt" : "Preta";
+                                                let beltText = this.add.text(0, -37, '[FAIXA ' + bStr.toUpperCase() + ']', {
+                                                    fontSize: '6.5px',
+                                                    fontFamily: 'monospace',
+                                                    color: '#38bdf8'
+                                                }).setOrigin(0.5);
+
+                                                this.localPlayer.add([sprite, tagText, beltText]);
+                                                this.localPlayer.gridX = $playerX;
+                                                this.localPlayer.gridY = $playerY;
+
+                                                // Static Dojo NPCs
+                                                this.spawnDojoNPCs();
+                                            }
+
+                                            spawnDojoNPCs() {
+                                                const npcs = [
+                                                    { name: 'Mestre Cícero', belt: 'Preta', x: 2, y: 4, tint: 0x5b21b6 },
+                                                    { name: 'Guerreiro Luta', belt: 'Coral', x: 4, y: 2, tint: 0x9a3412 }
+                                                ];
+
+                                                npcs.forEach(n => {
+                                                    let pos = cartToIso(n.x, n.y);
+                                                    let container = this.add.container(pos.x, pos.y);
+                                                    let bSprite = this.add.image(0, -20, 'char_front');
+                                                    bSprite.setTint(n.tint);
+
+                                                    let bTag = this.add.text(0, -48, n.name, {
+                                                        fontSize: '8px',
+                                                        fontFamily: 'monospace',
+                                                        color: '#e2e8f0',
+                                                        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                                                        padding: { x: 2, y: 1 }
+                                                    }).setOrigin(0.5);
+
+                                                    let bBelt = this.add.text(0, -37, '[FAIXA ' + n.belt.toUpperCase() + ']', {
+                                                        fontSize: '6px',
+                                                        fontFamily: 'monospace',
+                                                        color: '#94a3b8'
+                                                    }).setOrigin(0.5);
+
+                                                    container.add([bSprite, bTag, bBelt]);
+                                                });
+                                            }
+
+                                            moveLocalPlayer(dx, dy) {
+                                                let nextX = this.localPlayer.gridX + dx;
+                                                let nextY = this.localPlayer.gridY + dy;
+
+                                                if (nextX >= 0 && nextX < GRID_SIZE && nextY >= 0 && nextY < GRID_SIZE) {
+                                                    if (!this.collisionGrid[nextX][nextY]) {
+                                                        this.localPlayer.gridX = nextX;
+                                                        this.localPlayer.gridY = nextY;
+
+                                                        let targetIso = cartToIso(nextX, nextY);
+                                                        this.tweens.add({
+                                                            targets: this.localPlayer,
+                                                            x: targetIso.x,
+                                                            y: targetIso.y,
+                                                            duration: 150,
+                                                            ease: 'Power1'
+                                                        });
+
+                                                        document.getElementById('val-coords').innerText = '(' + nextX + ', ' + nextY + ')';
+
+                                                        // Send coordinates back to Android JVM layer
+                                                        if (window.AndroidWebView) {
+                                                            window.AndroidWebView.postMessage(JSON.stringify({
+                                                                type: 'PLAYER_MOVE',
+                                                                x: nextX,
+                                                                y: nextY
+                                                            }));
+                                                        }
+                                                    } else {
+                                                        this.cameras.main.flash(45, 185, 28, 28);
+                                                    }
+                                                }
+                                            }
+
+                                            update(time, delta) {
+                                                document.getElementById('val-fps').innerText = Math.round(1000 / delta);
+                                            }
+                                        }
+
+                                        const config = {
+                                            type: Phaser.AUTO,
+                                            width: window.innerWidth,
+                                            height: window.innerHeight,
+                                            parent: 'game-container',
+                                            scene: JiuVerseIsometricDojo
+                                        };
+
+                                        const game = new Phaser.Game(config);
+
+                                        // Bind API trigger function to window context
+                                        window.movePlayer = function(dx, dy) {
+                                            let scene = game.scene.keys['JiuVerseDojo'];
+                                            if (scene) {
+                                                scene.moveLocalPlayer(dx, dy);
+                                            }
+                                        };
+
+                                        window.updatePlayerCoords = function(x, y) {
+                                            let scene = game.scene.keys['JiuVerseDojo'];
+                                            if (scene && scene.localPlayer) {
+                                                if (scene.localPlayer.gridX !== x || scene.localPlayer.gridY !== y) {
+                                                    scene.localPlayer.gridX = x;
+                                                    scene.localPlayer.gridY = y;
+                                                    let targetIso = cartToIso(x, y);
+                                                    scene.localPlayer.x = targetIso.x;
+                                                    scene.localPlayer.y = targetIso.y;
+                                                    document.getElementById('val-coords').innerText = '(' + x + ', ' + y + ')';
+                                                }
+                                            }
+                                        };
+
+                                        window.addEventListener('resize', () => {
+                                            game.scale.resize(window.innerWidth, window.innerHeight);
+                                        });
+                                    </script>
+                                </body>
+                                </html>
+                            """.trimIndent()
+
+                            loadDataWithBaseURL("https://phaser.io", html, "text/html", "UTF-8", null)
+                            webViewRef = this
+                        }
+                    },
+                    update = {
+                        it.evaluateJavascript("if (window.updatePlayerCoords) { window.updatePlayerCoords($playerX, $playerY); }", null)
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                // Isometric perspective simulated layout fallback
+                Box(
+                    modifier = Modifier
+                        .width(180.dp)
+                        .height(180.dp)
+                ) {
+                    val tWidth = 26f
+                    val tHeight = 13f
+                    val originX = 75f // offset centering
+                    val originY = 20f
+
+                    // Draw Tatami Tiles matching isometric projection
+                    for (r in 0..4) {
+                        for (c in 0..4) {
+                            val isoX = originX + (c - r) * (tWidth / 2f)
+                            val isoY = originY + (c + r) * (tHeight / 2f)
+
+                            val isPlayer = playerX == c && playerY == r
+                            val isBot = (c == 1 && r == 3) || (c == 3 && r == 1)
+                            val isBlocked = c == 0 || r == 0 || c == 4 || r == 4
+
+                            // Render each tile offset dynamically
+                            Box(
+                                modifier = Modifier
+                                    .size(width = tWidth.dp, height = (tHeight + 2).dp)
+                                    .offset(x = isoX.dp, y = isoY.dp)
+                                    .background(
+                                        color = if (isBlocked) Color(0xFF7F1D1D)
+                                                else if (isPlayer) Color(0xFF1D4ED8)
+                                                else if (isBot) Color(0xFF5B21B6)
+                                                else if ((r + c) % 2 == 0) Color(0xFF0F172A)
+                                                else Color(0xFF1E293B),
+                                        shape = RoundedCornerShape(2.dp)
+                                    )
+                                    .border(0.5.dp, if (isBlocked) Color(0xFFB91C1C) else Color(0xFF334155), RoundedCornerShape(2.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isPlayer) {
+                                    Text(
+                                        "🥋", 
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.offset(y = (-6).dp)
+                                    )
+                                }
+                                if (isBot) {
+                                    Text(
+                                        "👤", 
+                                        fontSize = 9.sp,
+                                        color = Color.White,
+                                        modifier = Modifier.offset(y = (-4).dp)
+                                    )
+                                    
+                                    // Speech/Proximity bubble simulation for nearby players
+                                    val dist = Math.abs(playerX - c) + Math.abs(playerY - r)
+                                    if (dist <= 2 && proxFilter) {
+                                        Box(
+                                            modifier = Modifier
+                                                .background(Color(0xFF10B981), RoundedCornerShape(3.dp))
+                                                .padding(horizontal = 3.dp, vertical = 1.dp)
+                                                .offset(y = (-12).dp)
+                                        ) {
+                                            Text("OSS?", fontSize = 6.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                                        }
                                     }
                                 }
                             }
@@ -811,7 +1172,13 @@ fun SimHomeScreen(
                     modifier = Modifier
                         .size(32.dp)
                         .background(Color(0xFF1E293B), RoundedCornerShape(6.dp))
-                        .clickable { onMove(0, -1) },
+                        .clickable { 
+                            if (useWebPhaser) {
+                                webViewRef?.evaluateJavascript("javascript:if (window.movePlayer) { window.movePlayer(0, -1); }", null)
+                            } else {
+                                onMove(0, -1) 
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Text("▲", color = Color(0xFF14B8A6), fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -822,7 +1189,13 @@ fun SimHomeScreen(
                         modifier = Modifier
                             .size(32.dp)
                             .background(Color(0xFF1E293B), RoundedCornerShape(6.dp))
-                            .clickable { onMove(-1, 0) },
+                            .clickable { 
+                                if (useWebPhaser) {
+                                    webViewRef?.evaluateJavascript("javascript:if (window.movePlayer) { window.movePlayer(-1, 0); }", null)
+                                } else {
+                                    onMove(-1, 0)
+                                }
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Text("◀", color = Color(0xFF14B8A6), fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -832,7 +1205,13 @@ fun SimHomeScreen(
                         modifier = Modifier
                             .size(32.dp)
                             .background(Color(0xFF1E293B), RoundedCornerShape(6.dp))
-                            .clickable { onMove(1, 0) },
+                            .clickable { 
+                                if (useWebPhaser) {
+                                    webViewRef?.evaluateJavascript("javascript:if (window.movePlayer) { window.movePlayer(1, 0); }", null)
+                                } else {
+                                    onMove(1, 0)
+                                }
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Text("▶", color = Color(0xFF14B8A6), fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -843,7 +1222,13 @@ fun SimHomeScreen(
                     modifier = Modifier
                         .size(32.dp)
                         .background(Color(0xFF1E293B), RoundedCornerShape(6.dp))
-                        .clickable { onMove(0, 1) },
+                        .clickable { 
+                            if (useWebPhaser) {
+                                webViewRef?.evaluateJavascript("javascript:if (window.movePlayer) { window.movePlayer(0, 1); }", null)
+                            } else {
+                                onMove(0, 1)
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Text("▼", color = Color(0xFF14B8A6), fontSize = 11.sp, fontWeight = FontWeight.Bold)
