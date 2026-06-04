@@ -48,7 +48,19 @@ import com.example.architecture.views.BattlePassTab
 import com.example.architecture.views.TournamentsTab
 import com.example.architecture.views.AdminTab
 import com.example.architecture.views.LandscapeSandboxTab
+import com.example.architecture.views.AInpcTab
+import com.example.architecture.views.PetsTab
+import com.example.architecture.views.SocialTab
+import com.example.architecture.views.HousingTab
+import com.example.architecture.views.GuildWarsTab
+import com.example.architecture.views.LiveStreamingTab
+import com.example.architecture.views.SenseiAiTab
+import androidx.compose.material.icons.filled.SportsMartialArts
+import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Landscape
+import androidx.compose.material.icons.filled.Pets
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Hearing
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Home
@@ -97,6 +109,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Force landscape orientation to open horizontally
+        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         
         // Mandatory usage for clean immersive layouts
         enableEdgeToEdge()
@@ -152,7 +167,14 @@ fun ArchitectureHubMainScreen(
         WorkbookTabItem("Passe Batalha", Icons.Default.Star, "tab_battlepass"),
         WorkbookTabItem("Torneios eSports", Icons.Default.EmojiEvents, "tab_tournaments"),
         WorkbookTabItem("Painel Admin (CTO)", Icons.Default.Settings, "tab_admin_cockpit"),
-        WorkbookTabItem("Mundo Landscape (Live)", Icons.Default.Landscape, "tab_landscape_mmo")
+        WorkbookTabItem("Mundo Landscape (Live)", Icons.Default.Landscape, "tab_landscape_mmo"),
+        WorkbookTabItem("Mestres & NPCs (IA)", Icons.Default.Psychology, "tab_ai_npcs"),
+        WorkbookTabItem("Mascotes & Pets", Icons.Default.Pets, "tab_pet_companions"),
+        WorkbookTabItem("Rede Social & Casamentos", Icons.Default.Favorite, "tab_social_marriage"),
+        WorkbookTabItem("Moradias & Sandbox CT", Icons.Default.Home, "tab_housing_sandbox"),
+        WorkbookTabItem("Guild Wars & Conquistas", Icons.Default.SportsMartialArts, "tab_guild_wars"),
+        WorkbookTabItem("Streaming & CDN", Icons.Default.LiveTv, "tab_live_streaming"),
+        WorkbookTabItem("Sensei AI (Guardião)", Icons.Default.Psychology, "tab_sensei_ai")
     )
 
     Column(
@@ -273,7 +295,7 @@ fun ArchitectureHubMainScreen(
             ) { tabIdx ->
                 when (tabIdx) {
                     0 -> ClientSimulatorTab(viewModel = viewModel)
-                    1 -> OverviewTab()
+                    1 -> OverviewTab(viewModel = viewModel)
                     2 -> DirectoryTab(viewModel = viewModel)
                     3 -> DatabaseTab(viewModel = viewModel)
                     4 -> ScaleTab(viewModel = viewModel)
@@ -292,6 +314,13 @@ fun ArchitectureHubMainScreen(
                     17 -> TournamentsTab(viewModel = viewModel)
                     18 -> AdminTab(viewModel = viewModel)
                     19 -> LandscapeSandboxTab(viewModel = viewModel)
+                    20 -> AInpcTab(viewModel = viewModel)
+                    21 -> PetsTab(viewModel = viewModel)
+                    22 -> SocialTab(viewModel = viewModel)
+                    23 -> HousingTab(viewModel = viewModel)
+                    24 -> GuildWarsTab(viewModel = viewModel)
+                    25 -> LiveStreamingTab(viewModel = viewModel)
+                    26 -> SenseiAiTab(viewModel = viewModel)
                 }
             }
         }

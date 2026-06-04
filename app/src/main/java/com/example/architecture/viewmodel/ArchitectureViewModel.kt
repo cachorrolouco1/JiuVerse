@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit
 class ArchitectureViewModel : ViewModel() {
 
     // --- Tab Navigation State ---
-    private val _selectedTab = MutableStateFlow(0)
+    private val _selectedTab = MutableStateFlow(1)
     val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()
 
     fun selectTab(index: Int) {
@@ -261,6 +261,428 @@ class ArchitectureViewModel : ViewModel() {
                     
                     O que mais eu posso elucidar sobre a arquitetura para você? Pergunte sobre Docker, Prisma relations, anti-spam ou banco de dados!
                 """.trimIndent()
+            }
+        }
+    }
+
+    // --- Sensei AI Assistant State (Official Chat, Voice & Memory Assistant) ---
+    private var senseiRepository: com.example.architecture.database.SenseiRepository? = null
+
+    private val _senseiChatHistory = MutableStateFlow<List<com.example.architecture.database.SenseiChatMessageEntity>>(emptyList())
+    val senseiChatHistory: StateFlow<List<com.example.architecture.database.SenseiChatMessageEntity>> = _senseiChatHistory.asStateFlow()
+
+    private val _playerMemory = MutableStateFlow<com.example.architecture.database.PlayerMemoryEntity?>(null)
+    val playerMemory: StateFlow<com.example.architecture.database.PlayerMemoryEntity?> = _playerMemory.asStateFlow()
+
+    private val _isSenseiThinking = MutableStateFlow(false)
+    val isSenseiThinking: StateFlow<Boolean> = _isSenseiThinking.asStateFlow()
+
+    // --- Real Academies Integration State Flows ---
+    private val _realAcademies = MutableStateFlow<List<com.example.architecture.database.RealAcademyEntity>>(emptyList())
+    val realAcademies: StateFlow<List<com.example.architecture.database.RealAcademyEntity>> = _realAcademies.asStateFlow()
+
+    private val _realTournaments = MutableStateFlow<List<com.example.architecture.database.AcademyTournamentEntity>>(emptyList())
+    val realTournaments: StateFlow<List<com.example.architecture.database.AcademyTournamentEntity>> = _realTournaments.asStateFlow()
+
+    private val _selectedAcademyId = MutableStateFlow<Int?>(null)
+    val selectedAcademyId: StateFlow<Int?> = _selectedAcademyId.asStateFlow()
+
+    private val _selectedAcademyStudents = MutableStateFlow<List<com.example.architecture.database.GymStudentEntity>>(emptyList())
+    val selectedAcademyStudents: StateFlow<List<com.example.architecture.database.GymStudentEntity>> = _selectedAcademyStudents.asStateFlow()
+
+    fun initializeSensei(context: android.content.Context) {
+        if (senseiRepository != null) return
+        val db = com.example.architecture.database.SenseiRoomDatabase.getDatabase(context)
+        val repo = com.example.architecture.database.SenseiRepository(db)
+        senseiRepository = repo
+
+        viewModelScope.launch {
+            repo.chatHistory.collect { messages ->
+                _senseiChatHistory.value = messages
+            }
+        }
+
+        viewModelScope.launch {
+            repo.playerMemory.collect { memory ->
+                _playerMemory.value = memory ?: com.example.architecture.database.PlayerMemoryEntity()
+            }
+        }
+
+        viewModelScope.launch {
+            repo.allAcademies.collect { academies ->
+                _realAcademies.value = academies
+            }
+        }
+
+        viewModelScope.launch {
+            repo.allTournaments.collect { tournaments ->
+                _realTournaments.value = tournaments
+            }
+        }
+        
+        // Populate initial data if empty context is detected
+        viewModelScope.launch {
+            val direct = repo.getPlayerMemoryDirect()
+            if (direct.completedQuestsCount == 0 && _senseiChatHistory.value.isEmpty()) {
+                repo.savePlayerMemory(com.example.architecture.database.PlayerMemoryEntity())
+                repo.addChatMessage("sensei", "Oss, jovem herói! Sou o Sensei AI, o guardião de sabedoria do JiuVerse. Como posso te guiar hoje em sua caminhada marcial?", false, "Iniciante")
+            }
+
+            // Populate default real-world academies on startup if empty
+            delay(300)
+            repo.allAcademies.collect { currentList ->
+                if (currentList.isEmpty()) {
+                    val defaultAcademies = listOf(
+                        com.example.architecture.database.RealAcademyEntity(
+                            name = "Alliance Itaim Bibi",
+                            cnpj = "09.112.554/0001-30",
+                            responsibleMaster = "Mestre Fabio Gurgel",
+                            region = "São Paulo, SP",
+                            phone = "(11) 97777-5544",
+                            isVerified = true,
+                            verificationDocUrl = "https://jus.br/cnpj/alliance-sp",
+                            memberCount = 120,
+                            jiuCoinsBalance = 52000,
+                            realRankPoints = 940,
+                            virtualRankPoints = 1250,
+                            monetizationPlan = "Premium Dojo",
+                            monetizationPrice = 199,
+                            virtualGuildSynced = "Alliance Moema"
+                        ),
+                        com.example.architecture.database.RealAcademyEntity(
+                            name = "Gracie Barra Rio Central",
+                            cnpj = "14.285.961/0001-44",
+                            responsibleMaster = "Mestre Carlos Gracie Jr.",
+                            region = "Rio de Janeiro, RJ",
+                            phone = "(21) 98888-7766",
+                            isVerified = true,
+                            verificationDocUrl = "https://jus.br/cnpj/gb-central",
+                            memberCount = 180,
+                            jiuCoinsBalance = 84000,
+                            realRankPoints = 1120,
+                            virtualRankPoints = 1540,
+                            monetizationPlan = "Franquia Master",
+                            monetizationPrice = 350,
+                            virtualGuildSynced = "Gracie Barra central"
+                        ),
+                        com.example.architecture.database.RealAcademyEntity(
+                            name = "Checkmat Pinheiros",
+                            cnpj = "18.334.887/0001-90",
+                            responsibleMaster = "Mestre Leo Vieira",
+                            region = "São Paulo, SP",
+                            phone = "(11) 96666-8899",
+                            isVerified = false,
+                            verificationDocUrl = "",
+                            memberCount = 65,
+                            jiuCoinsBalance = 24000,
+                            realRankPoints = 510,
+                            virtualRankPoints = 790,
+                            monetizationPlan = "Plano Inicial",
+                            monetizationPrice = 99,
+                            virtualGuildSynced = "Atos San Diego"
+                        )
+                    )
+                    defaultAcademies.forEach { repo.saveAcademy(it) }
+
+                    // Default tournaments
+                    repo.addTournament(
+                        com.example.architecture.database.AcademyTournamentEntity(
+                            academyId = 1,
+                            title = "Desafio Estadual Meia Guarda Alliance",
+                            eventType = "Campeonato Real",
+                            entryFeeBrl = 80,
+                            virtualSyncBonus = 400,
+                            eventDate = "15 Junho 2026",
+                            status = "Agendado"
+                        )
+                    )
+                    repo.addTournament(
+                        com.example.architecture.database.AcademyTournamentEntity(
+                            academyId = 2,
+                            title = "Copa Rio Sul Peso Absoluto",
+                            eventType = "Campeonato Real",
+                            entryFeeBrl = 120,
+                            virtualSyncBonus = 800,
+                            eventDate = "22 Junho 2026",
+                            status = "Agendado"
+                        )
+                    )
+                    repo.addTournament(
+                        com.example.architecture.database.AcademyTournamentEntity(
+                            academyId = 3,
+                            title = "Seminário Passagem de Guarda Moderna",
+                            eventType = "Seminário",
+                            entryFeeBrl = 50,
+                            virtualSyncBonus = 200,
+                            eventDate = "28 Junho 2026",
+                            status = "Agendado"
+                        )
+                    )
+
+                    // Default students
+                    repo.enrollStudent(com.example.architecture.database.GymStudentEntity(academyId = 1, name = "Bruno Malfacine", belt = "Preta", registrationApproved = true, virtualNickname = "MalfacinePassador"))
+                    repo.enrollStudent(com.example.architecture.database.GymStudentEntity(academyId = 1, name = "Marcus Buchecha", belt = "Preta", registrationApproved = true, virtualNickname = "BuchechaUltra"))
+                    repo.enrollStudent(com.example.architecture.database.GymStudentEntity(academyId = 2, name = "Guerreiro Copacabana", belt = "Azul", registrationApproved = false, virtualNickname = "GuerreiroCopa"))
+                    repo.enrollStudent(com.example.architecture.database.GymStudentEntity(academyId = 2, name = "GuardaInvisivel", belt = "Roxa", registrationApproved = true, virtualNickname = "GuardaInvisivel"))
+                    repo.enrollStudent(com.example.architecture.database.GymStudentEntity(academyId = 3, name = "Iniciante Pinheiros", belt = "Branca", registrationApproved = false, virtualNickname = "FaixaBranca99"))
+
+                    // Automatically select first academy
+                    selectAcademy(1)
+                }
+            }
+        }
+    }
+
+    fun selectAcademy(id: Int?) {
+        _selectedAcademyId.value = id
+        if (id != null) {
+            viewModelScope.launch {
+                senseiRepository?.getStudentsForAcademy(id)?.collect { students ->
+                    _selectedAcademyStudents.value = students
+                }
+            }
+        } else {
+            _selectedAcademyStudents.value = emptyList()
+        }
+    }
+
+    fun registerAcademy(name: String, cnpj: String, master: String, region: String, phone: String, plan: String, price: Int) {
+        viewModelScope.launch {
+            val newGym = com.example.architecture.database.RealAcademyEntity(
+                name = name,
+                cnpj = cnpj,
+                responsibleMaster = master,
+                region = region,
+                phone = phone,
+                isVerified = false,
+                verificationDocUrl = "",
+                memberCount = 1,
+                jiuCoinsBalance = 1500,
+                realRankPoints = 200,
+                virtualRankPoints = 350,
+                monetizationPlan = plan,
+                monetizationPrice = price,
+                virtualGuildSynced = name + " Virtual"
+            )
+            senseiRepository?.saveAcademy(newGym)
+        }
+    }
+
+    fun updateAcademy(academy: com.example.architecture.database.RealAcademyEntity) {
+        viewModelScope.launch {
+            senseiRepository?.updateAcademy(academy)
+        }
+    }
+
+    fun verifyAcademy(academyId: Int, verified: Boolean) {
+        viewModelScope.launch {
+            val academy = _realAcademies.value.find { it.id == academyId }
+            if (academy != null) {
+                senseiRepository?.updateAcademy(academy.copy(isVerified = verified, verificationDocUrl = "https://jus.br/verification-approved-${academy.id}"))
+            }
+        }
+    }
+
+    fun addTournamentToAcademy(academyId: Int, title: String, type: String, fee: Int, bonus: Int, date: String) {
+        viewModelScope.launch {
+            val tournament = com.example.architecture.database.AcademyTournamentEntity(
+                academyId = academyId,
+                title = title,
+                eventType = type,
+                entryFeeBrl = fee,
+                virtualSyncBonus = bonus,
+                eventDate = date,
+                status = "Agendado"
+            )
+            senseiRepository?.addTournament(tournament)
+        }
+    }
+
+    fun deleteTournamentFromAcademy(eventId: Int) {
+        viewModelScope.launch {
+            senseiRepository?.deleteTournament(eventId)
+        }
+    }
+
+    fun enrollStudentToAcademy(academyId: Int, name: String, belt: String, nickname: String, approved: Boolean = false) {
+        viewModelScope.launch {
+            val student = com.example.architecture.database.GymStudentEntity(
+                academyId = academyId,
+                name = name,
+                belt = belt,
+                registrationApproved = approved,
+                virtualNickname = nickname
+            )
+            senseiRepository?.enrollStudent(student)
+            
+            // Increment member count in RealAcademy
+            val academy = _realAcademies.value.find { it.id == academyId }
+            if (academy != null) {
+                senseiRepository?.updateAcademy(academy.copy(memberCount = academy.memberCount + 1))
+            }
+        }
+    }
+
+    fun approveStudent(studentId: Int, approved: Boolean) {
+        viewModelScope.launch {
+            senseiRepository?.verifyStudent(studentId, approved)
+            
+            // If approved, trigger collection updates
+            val currentId = _selectedAcademyId.value
+            if (currentId != null) {
+                selectAcademy(currentId)
+            }
+        }
+    }
+
+    fun expelStudent(studentId: Int) {
+        viewModelScope.launch {
+            val student = _selectedAcademyStudents.value.find { it.studentId == studentId }
+            if (student != null) {
+                senseiRepository?.deleteStudent(studentId)
+                
+                // Decrement member count
+                val academy = _realAcademies.value.find { it.id == student.academyId }
+                if (academy != null) {
+                    senseiRepository?.updateAcademy(academy.copy(memberCount = Math.max(0, academy.memberCount - 1)))
+                }
+                
+                // Refresh list
+                selectAcademy(student.academyId)
+            }
+        }
+    }
+
+    fun savePlayerMemory(memory: com.example.architecture.database.PlayerMemoryEntity) {
+        viewModelScope.launch {
+            senseiRepository?.savePlayerMemory(memory)
+        }
+    }
+
+    fun clearSenseiChatHistory() {
+        viewModelScope.launch {
+            senseiRepository?.clearChatHistory()
+            senseiRepository?.addChatMessage("sensei", "Memória limpa, herói! Vamos recomeçar do zero.", false, "Dojo")
+        }
+    }
+
+    fun askSensei(prompt: String, speechTextOverride: ((String) -> Unit)? = null) {
+        if (prompt.trim().isEmpty() || _isSenseiThinking.value) return
+
+        _isSenseiThinking.value = true
+
+        viewModelScope.launch {
+            // First save user message to chat history
+            senseiRepository?.addChatMessage("player", prompt, false, "Conversa")
+            
+            // Generate response
+            val currentMemory = senseiRepository?.getPlayerMemoryDirect() ?: com.example.architecture.database.PlayerMemoryEntity()
+            
+            val configKey = BuildConfig.GEMINI_API_KEY
+            val isMockOffline = configKey.isEmpty() || configKey == "MY_GEMINI_API_KEY"
+
+            val systemSetupPrompt = """
+                Você é o **Sensei AI**, o assistente oficial inteligente e sábio de **JiuVerse** (um MMORPG de artes marciais e jiu-jitsu social de alta concorrência).
+                Sua personalidade é carismática, mística, firme e encorajadora. Você usa termos do jiu-jitsu como "Oss", "Tatame", "Guardeiro", "Passador", "Alavanca" e fala um português heróico e inspirador.
+                
+                Você conhece o estado atual do jogador (PLAYER MEMORY):
+                - Nome: ${currentMemory.playerName}
+                - Faixa: ${currentMemory.playerBelt}
+                - Estilo Preferido: ${currentMemory.favoriteStyle}
+                - Missões Cumpridas: ${currentMemory.completedQuestsCount}
+                - Último Local: ${currentMemory.lastVisitedRegion}
+                - Minutos Treinados: ${currentMemory.totalTrainingMinutes}
+                - Reputação: ${currentMemory.masterReputation}
+                
+                O usuário está te abordando. Responda em português de forma concisa (máximo 4-5 frases para ser amigável em chat de voz e texto no celular).
+                Forneça respostas específicas de acordo com o que ele perguntou:
+                1. Guia para iniciantes: Ofereça conselhos de postura, quedas e guarda fechada.
+                2. Sugestão de missões: Proponha missões como treinar na areia do Arpoador, desafiar o Bot de Sparring, ou meditar na Baía.
+                3. Ajuda no mapa: Explique como encontrar o Gracie Barra Central, Codan Shugyo ou Tiger Muay Thai.
+                4. Ajuda em eventos: Fale sobre a abertura do Grand Prix de Peso Absoluto ou copas síncronas.
+                
+                Lembre-se: Use a memória dele para dar respostas incrivelmente contextuais!
+            """.trimIndent()
+
+            val aiAnswerText = try {
+                if (isMockOffline) {
+                    delay(1200)
+                    generateLocalSenseiReply(prompt, currentMemory)
+                } else {
+                    val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$configKey"
+                    val requestJson = JSONObject()
+                    
+                    val partsJson = JSONObject().put("text", prompt)
+                    val contentJson = JSONObject().put("parts", JSONArray().put(partsJson))
+                    requestJson.put("contents", JSONArray().put(contentJson))
+
+                    val sysPart = JSONObject().put("text", systemSetupPrompt)
+                    val sysContent = JSONObject().put("parts", JSONArray().put(sysPart))
+                    requestJson.put("systemInstruction", sysContent)
+
+                    val genConfig = JSONObject()
+                    genConfig.put("temperature", 0.8)
+                    requestJson.put("generationConfig", genConfig)
+
+                    val requestBodyMsg = requestJson.toString().toRequestBody("application/json".toMediaType())
+                    
+                    val request = Request.Builder()
+                        .url(url)
+                        .post(requestBodyMsg)
+                        .build()
+
+                    val response = httpClient.newCall(request).execute()
+                    if (response.isSuccessful) {
+                        val responseBodyStr = response.body?.string() ?: ""
+                        val responseJson = JSONObject(responseBodyStr)
+                        
+                        val candidates = responseJson.getJSONArray("candidates")
+                        val firstCandidate = candidates.getJSONObject(0)
+                        val contentObject = firstCandidate.getJSONObject("content")
+                        val partsArr = contentObject.getJSONArray("parts")
+                        partsArr.getJSONObject(0).getString("text")
+                    } else {
+                        "Oss, ${currentMemory.playerName}! Meus canais de energia estelar estão instáveis no momento (HTTP ${response.code}). Como conselho de mestre: ${generateLocalSenseiReply(prompt, currentMemory)}"
+                    }
+                }
+            } catch (e: Exception) {
+                "Houve uma interferência no éter: ${e.localizedMessage}. Mas ouça meu conselho interno: ${generateLocalSenseiReply(prompt, currentMemory)}"
+            }
+
+            // Save response to db
+            senseiRepository?.addChatMessage("sensei", aiAnswerText, true, "Conversa")
+            
+            // Speak response if helper is connected
+            speechTextOverride?.invoke(aiAnswerText)
+
+            _isSenseiThinking.value = false
+        }
+    }
+
+    private fun generateLocalSenseiReply(prompt: String, memory: com.example.architecture.database.PlayerMemoryEntity): String {
+        val q = prompt.uppercase()
+        val name = memory.playerName
+        val belt = memory.playerBelt
+        
+        return when {
+            q.contains("INICIANTE") || q.contains("GUIDE") || q.contains("COMEÇAR") || q.contains("COMEÇO") || q.contains("DICA") -> {
+                "Oss! Grande herói $name! Como você treina com a $belt, meu conselho inicial é focar na postura defensiva. Se sua guarda for transpassada, use as alavancas do quadril. Vá ao Gracie Barra Central treinar a Passagem Invisível com o Grande Mestre Rickson!"
+            }
+            q.contains("MISSÃO") || q.contains("MISSAO") || q.contains("QUEST") || q.contains("TAREFA") -> {
+                val newCount = memory.completedQuestsCount + 1
+                viewModelScope.launch {
+                    senseiRepository?.savePlayerMemory(memory.copy(completedQuestsCount = newCount, masterReputation = memory.masterReputation + 15))
+                }
+                "Para sua caminhada marcial, $name, sugiro a missão: 'Limpeza de Tatame Cósmica'. Complete 5 sparrings na areia molhada da praia e retorne para receber +15 de Reputação. Acabo de registrar o início desta jornada em sua memória!"
+            }
+            q.contains("MAPA") || q.contains("LOCAL") || q.contains("ONDE") || q.contains("ACADEMIA") || q.contains("DOJO") -> {
+                "No mapa do JiuVerse, $name, recomendo que visite as três coordenadas sagradas: 1. Gracie Barra Central na Baía para lutas NoGi; 2. Kodan Shugyo Academy na colina para treinar quedas circulares; 3. Tiger Muay Thai RJ ao lado para refinar os socos energéticos."
+            }
+            q.contains("EVENTO") || q.contains("TORNEIO") || q.contains("COPA") || q.contains("PROVA") -> {
+                "Oss, herói! No momento os administradores estão rodando a Copa Angra Síncrona, assistida via Streaming Tab! E as inscrições para o lendário Grand Prix de Peso Absoluto estão ativas. O lutador que mantiver o foco e a respiração no dojo levará o cinturão!"
+            }
+            else -> {
+                "Oss! Te escuto perfeitamente, nobre $name, portador da nossa $belt. No JiuVerse, a mente do guerreiro deve ser maleável como a água e inquebrável como o carboneto de silício. Qual segredo das alavancas você quer decifrar comigo hoje?"
             }
         }
     }
