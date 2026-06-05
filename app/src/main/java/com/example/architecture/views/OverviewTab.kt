@@ -54,7 +54,8 @@ data class IsometricLandmark(
     val iconEmoji: String,
     val description: String,
     val targetTabIdx: Int,
-    val accentColor: Color
+    val accentColor: Color,
+    val academyId: Int? = null
 )
 
 // Characters/NPCs living inside the virtual plaza
@@ -121,6 +122,8 @@ fun OverviewTab(
     }
 
     // --- GAME WORLD DYNAMIC STATE & MULTIPLAYER SIMULATION ---
+    val realAcademies by viewModel.realAcademies.collectAsState()
+
     var playerGridX by remember { mutableStateOf(5.0f) }
     var playerGridY by remember { mutableStateOf(7.0f) }
     var targetGridX by remember { mutableStateOf(5.0f) }
@@ -135,14 +138,24 @@ fun OverviewTab(
 
     // Helper functions for collisions and obstacle detection
     val isCellWalkable: (Int, Int) -> Boolean = { cx, cy ->
-        val landmarksLocations = listOf(
+        val staticLandmarksLocations = listOf(
             Pair(5, 1), // Event Tower
-            Pair(2, 2), // Portal Academias
             Pair(2, 8), // Arena PvP
-            Pair(8, 2), // Dojo Shop / Loja
+            Pair(8, 2), // Dojo Shop/Loja
             Pair(8, 8), // Ranking Hall
             Pair(5, 5)  // Center portal beam
         )
+        val dynamicAcademyLocations = realAcademies.mapIndexed { idx, _ ->
+            when (idx) {
+                0 -> Pair(2, 2)
+                1 -> Pair(3, 4)
+                2 -> Pair(1, 4)
+                3 -> Pair(4, 2)
+                4 -> Pair(2, 4)
+                else -> Pair(1 + (idx % 4), 2 + (idx % 3))
+            }
+        }
+        val landmarksLocations = staticLandmarksLocations + dynamicAcademyLocations
         Pair(cx, cy) !in landmarksLocations
     }
 
@@ -292,8 +305,8 @@ fun OverviewTab(
     }
 
     // High Density Landmarks Setup
-    val landmarks = remember {
-        listOf(
+    val landmarks = remember(realAcademies) {
+        val staticLandmarks = listOf(
             IsometricLandmark(
                 name = "Torre de Eventos",
                 gridX = 5,
@@ -302,15 +315,6 @@ fun OverviewTab(
                 description = "Área de Eventos & Torneios Locais Autenticados",
                 targetTabIdx = 17, // TournamentsTab
                 accentColor = BlueprintOrange
-            ),
-            IsometricLandmark(
-                name = "Portal Academias",
-                gridX = 2,
-                gridY = 2,
-                iconEmoji = "⛩️",
-                description = "Acesso ao Hub de Academias Reais Integradas",
-                targetTabIdx = 8, // AcademyTab
-                accentColor = BlueprintCyan
             ),
             IsometricLandmark(
                 name = "Arena PvP",
@@ -340,6 +344,29 @@ fun OverviewTab(
                 accentColor = BlueprintCyan
             )
         )
+
+        val academyLandmarks = realAcademies.mapIndexed { idx, academy ->
+            val coord = when (idx) {
+                0 -> Pair(2, 2)
+                1 -> Pair(3, 4)
+                2 -> Pair(1, 4)
+                3 -> Pair(4, 2)
+                4 -> Pair(2, 4)
+                else -> Pair(1 + (idx % 4), 2 + (idx % 3))
+            }
+            IsometricLandmark(
+                name = academy.name,
+                gridX = coord.first,
+                gridY = coord.second,
+                iconEmoji = if (academy.isVerified) "⛩️" else "🏢",
+                description = "Responsável: ${academy.responsibleMaster} • Alunos: ${academy.memberCount}",
+                targetTabIdx = 8, // AcademyTab
+                accentColor = if (academy.isVerified) BlueprintCyan else BlueprintTeal,
+                academyId = academy.id
+            )
+        }
+
+        staticLandmarks + academyLandmarks
     }
 
     // Telepathy chat text state
@@ -1078,6 +1105,9 @@ fun OverviewTab(
                             .background(Color(0xE60F172A), RoundedCornerShape(4.dp))
                             .border(0.5.dp, landmark.accentColor, RoundedCornerShape(4.dp))
                             .clickable {
+                                if (landmark.academyId != null) {
+                                    viewModel.selectAcademy(landmark.academyId)
+                                }
                                 gameEvents.add(
                                     0,
                                     "⚡ [MIGRAÇÃO] Carregando módulo federado síncrono para ${landmark.name} (Tab index ${landmark.targetTabIdx})"
@@ -1098,7 +1128,7 @@ fun OverviewTab(
                                     color = BlueprintTextPrimary
                                 )
                                 Text(
-                                    text = "REGISTRAR",
+                                    text = if (landmark.academyId != null) "ACADEMIA" else "REGISTRAR",
                                     fontSize = 6.sp,
                                     fontWeight = FontWeight.Black,
                                     color = landmark.accentColor

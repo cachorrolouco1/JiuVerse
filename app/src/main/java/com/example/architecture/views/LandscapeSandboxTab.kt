@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -65,12 +66,83 @@ data class MmorpgQuest(
     var isDone: Boolean = false
 )
 
+data class ShopItemSim(
+    val id: String,
+    val name: String,
+    val description: String,
+    val category: String, // "DESTAQUES", "PROMOCOES", "COSMETICOS", "AVATARES"
+    val price: Int,
+    val currency: String, // "🪙" or "💎"
+    val originalPrice: Int? = null,
+    val labelText: String? = null,
+    val labelColor: Color = Color(0xFFEF4444),
+    val iconEmoji: String,
+    var isPurchased: Boolean = false
+)
+
 @Composable
 fun LandscapeSandboxTab(
     viewModel: ArchitectureViewModel,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+
+    val playerMemoryState by viewModel.playerMemory.collectAsState()
+    val playerMemory = playerMemoryState ?: com.example.architecture.database.PlayerMemoryEntity()
+
+    // MMORPG Inventory Overlay Dialog States
+    var showMmorpgInventory by remember { mutableStateOf(false) }
+    var mmorpgActiveTab by remember { mutableStateOf(0) } // 0: Itens, 1: Cosméticos, 2: Conquistas, 3: Equipamentos
+    var selectedInventoryItemId by remember { mutableStateOf("i1") }
+
+    // Integrated Virtual Shop Dialog States (Merchant NPC)
+    var showIntegratedShop by remember { mutableStateOf(false) }
+    var shopActiveCategory by remember { mutableStateOf("DESTAQUES") } // "DESTAQUES", "PROMOCOES", "COSMETICOS", "AVATARES"
+    var shopWalletJiCoins by remember { mutableStateOf(28500) }
+    var shopWalletJiuGems by remember { mutableStateOf(1250) }
+
+    val integratedShopItems = remember {
+        mutableStateListOf(
+            // DESTAQUES
+            ShopItemSim("s1", "Kimono Ouro Imperial", "O manto celestial costurado com fios purificados de ouro.", "DESTAQUES", 15000, "🪙", null, "MÍTICO", Color(0xFFFFD700), "🥋"),
+            ShopItemSim("s2", "Faixa Preta Holográfica", "Varia de tonalidade dinamicamente com base no sparring.", "DESTAQUES", 8000, "🪙", null, "EXCLUSIVO", Color(0xFFA855F7), "🎗️"),
+            ShopItemSim("s3", "Rashguard Cósmica", "Garante um rastro galáctico cintilante em volta de você.", "DESTAQUES", 300, "💎", null, "PROGRESSE", Color(0xFF3B82F6), "👕"),
+
+            // PROMOÇÕES
+            ShopItemSim("s4", "Rashguard Treino Pro", "Visual aerodinâmico esportivo NoGi com 50% de desconto.", "PROMOCOES", 1200, "🪙", 2400, "OFF 50%", Color(0xFFEF4444), "🥋"),
+            ShopItemSim("s5", "Suco de Açaí Sagrado (x10)", "Poção milenar concentrada para recuperar 100% de stamina.", "PROMOCOES", 450, "🪙", 900, "OFF 50%", Color(0xFF22C55E), "🥤"),
+            ShopItemSim("s6", "Chave do Baú Cósmico (x5)", "Permite decodificar e desvendar baús raros no sandbox stelar.", "PROMOCOES", 300, "💎", 600, "MAIS VENDIDO", Color(0xFFF59E0B), "🔑"),
+
+            // COSMÉTICOS
+            ShopItemSim("s7", "Aura Mística Flamejante", "Emite chamas azuis reativas ao mover-se pelo tatame.", "COSMETICOS", 3500, "🪙", null, "ESTILO", Color(0xFF06B6D4), "🔥"),
+            ShopItemSim("s8", "Pet Capivara de Quimono", "Uma fiel capivara que caminha ao seu lado usando uma mini-faixa.", "COSMETICOS", 5000, "🪙", null, "PET", Color(0xFFFF8C00), "🐹"),
+            ShopItemSim("s9", "Óculos de Realidade Cyberspace", "Ecrã neon holográfico flutuante sobre os olhos do avatar.", "COSMETICOS", 150, "💎", null, "EDIT", Color(0xFFEC4899), "🕶️"),
+
+            // AVATARES
+            ShopItemSim("s10", "Avatar Mestre Helio (Legado)", "Substitui completamente sua aparência pela lenda fundadora.", "AVATARES", 18000, "🪙", null, "RELÍQUIA", Color(0xFFFFD700), "👴"),
+            ShopItemSim("s11", "Avatar Shogun de Elite", "Skins de guerreiro clássico japonês reforçado com placas de aço.", "AVATARES", 9000, "🪙", null, "SENSACIONAL", Color(0xFFA855F7), "🥷"),
+            ShopItemSim("s12", "Player NoGi Campeão", "Visual ágil preparado para campeonatos sem pano profissionais.", "AVATARES", 200, "💎", null, "NOVO", Color(0xFF10B981), "🥋")
+        )
+    }
+
+    // Selected Cosmetics / Customizations lists matching the player
+    val mmorpgCosmetics = remember {
+        mutableStateListOf(
+            CustomizableOption("c1", "Careca Reluzente", "HAIR", "COMUM", BlueprintTeal),
+            CustomizableOption("c2", "Coque Samurai Dojo", "HAIR", "ÉPICO", Color(0xFFA855F7)),
+            CustomizableOption("c3", "Super Saiyajin Aurum", "HAIR", "MÍTICO", Color(0xFFEF4444)),
+            CustomizableOption("c4", "Pitbull de Coleira", "PET", "LENDÁRIO", BlueprintOrange),
+            CustomizableOption("c5", "Capivara de Faixa Preta", "PET", "MÍTICO", Color(0xFFEF4444))
+        )
+    }
+    var equippedHairId by remember { mutableStateOf("c2") } // Start with Samurai Coque
+    var equippedPetId by remember { mutableStateOf("c5") }  // Start with Capivara
+
+    // Equipment items states inside MMORPG HUD
+    var equippedHelmet by remember { mutableStateOf("Coque Samurai") }
+    var equippedGi by remember { mutableStateOf("Kimono Armadura Negra") }
+    var equippedBelt by remember { mutableStateOf("Faixa Preta Holográfica") }
+    var equippedRing by remember { mutableStateOf("Chave Cósmica Ring") }
 
     // Interactive States for Virtual World Simulation
     var playerX by remember { mutableStateOf(45f) }
@@ -103,6 +175,44 @@ fun LandscapeSandboxTab(
         )
     }
 
+    val handleShopBuyItem = { item: ShopItemSim ->
+        val hasBalance = if (item.currency == "🪙") {
+            shopWalletJiCoins >= item.price
+        } else {
+            shopWalletJiuGems >= item.price
+        }
+
+        if (hasBalance) {
+            if (item.currency == "🪙") {
+                shopWalletJiCoins -= item.price
+            } else {
+                shopWalletJiuGems -= item.price
+            }
+
+            item.isPurchased = true
+            recentDojoConsoleLog = "LOJA: Comprou '${item.name}' por ${item.price}${item.currency}!"
+            activeSpeechLabel = "Vendedor Wu: Excelente escolha! '${item.name}' enviado!"
+
+            if (item.category == "COSMETICOS") {
+                val type = if (item.name.contains("Pet")) "PET" else "HAIR"
+                mmorpgCosmetics.add(CustomizableOption(item.id, item.name, type, "LENDÁRIO", item.labelColor))
+            } else if (item.category == "AVATARES") {
+                recentDojoConsoleLog = "MUDANÇA DE SKIN: Atleta equipou novo avatar '${item.name}'!"
+            } else {
+                val existing = inventoryItems.find { it.icon == item.iconEmoji }
+                if (existing != null) {
+                    val idx = inventoryItems.indexOf(existing)
+                    inventoryItems[idx] = existing.copy(quantity = existing.quantity + 5)
+                } else {
+                    inventoryItems.add(InventoryShortcutSlot(item.id, item.name, item.iconEmoji, 5))
+                }
+            }
+        } else {
+            recentDojoConsoleLog = "LOJA ERRO: Saldo insuficiente para ${item.name}!"
+            activeSpeechLabel = "Wu: Você precisa de mais ${item.currency}!"
+        }
+    }
+
     // Interactive speech bubble clearing simulator
     LaunchedEffect(activeSpeechLabel) {
         if (activeSpeechLabel.isNotEmpty()) {
@@ -116,6 +226,7 @@ fun LandscapeSandboxTab(
         mutableStateListOf(
             VirtualMmorpgPlayer("npc1", "Mestre Helio Gracie", 30f, 25f, BlueprintOrange, Color.Yellow, "👴", 99, "Busque a alavanca perfeita.", true, "Grão-Mestre Fundador"),
             VirtualMmorpgPlayer("npc2", "Juiz de Chaves", 70f, 30f, BlueprintCyan, Color.White, "👔", 50, "Mantenham a postura limpa!", true, "Árbitros do Tatame"),
+            VirtualMmorpgPlayer("merchant_npc", "Vendedor Wu - Loja", 52f, 48f, Color(0xFFFFD700), Color(0xFFFF8C00), "🧙‍♂️", 88, "Confira os itens da Loja Virtual!", true, "NPC Mercador de Elite"),
             VirtualMmorpgPlayer("p1", "NoGi_King_XP", 25f, 65f, BlueprintTeal, Color.Green, "🥋", 15, "Estou comprando áreas do sandbox!"),
             VirtualMmorpgPlayer("p2", "Guard_Preta_9", 80f, 75f, Color(0xFFC084FC), Color.Magenta, "🧑‍🎤", 32, "Alguém do Atos Dojo online pro 1v1?"),
             VirtualMmorpgPlayer("p3", "Kimura_Master", 55f, 78f, Color(0xFFF472B6), Color.Red, "🥷", 24, "A chave do torneio fecha em 5min!")
@@ -226,7 +337,8 @@ fun LandscapeSandboxTab(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0F1D)),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Row(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Row(modifier = Modifier.fillMaxSize()) {
                 
                 // -------------------------------------------------------------
                 // LEFT COLUMN HUD (20% of area - Mini map & Profile - Habbo/Ragnarok vibe)
@@ -442,6 +554,11 @@ fun LandscapeSandboxTab(
                                 .clickable {
                                     recentDojoConsoleLog = "Focou em @${entity.name}. Atleta do dojo federado!"
                                     activeSpeechLabel = "E aí, @${entity.name}! Quer fechar um sparring síncrono?"
+                                    if (entity.id == "merchant_npc") {
+                                        showIntegratedShop = true
+                                        recentDojoConsoleLog = "Abriu o bazar integrado de @${entity.name}!"
+                                        activeSpeechLabel = "Boas-vindas ao bazar JiuVerse! Confira as novidades!"
+                                    }
                                 },
                             contentAlignment = Alignment.Center
                         ) {
@@ -606,6 +723,20 @@ fun LandscapeSandboxTab(
                             ) {
                                 Text("ACADEMIA", fontSize = 8.sp, fontWeight = FontWeight.Black, color = Color.Black)
                             }
+
+                            // INVENTORY BUTTON (🎒 INVENTÁRIO MMORPG WINDOW)
+                            Box(
+                                modifier = Modifier
+                                    .background(Color(0xFFE11D48), RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        showMmorpgInventory = true
+                                        recentDojoConsoleLog = "Abriu o inventário virtual estilo MMORPG!"
+                                        activeSpeechLabel = "🎒 Visualizando minha mochila!"
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                            ) {
+                                Text("🎒 INVENTÁRIO", fontSize = 8.sp, fontWeight = FontWeight.Black, color = Color.White)
+                            }
                         }
                     }
                 }
@@ -676,6 +807,807 @@ fun LandscapeSandboxTab(
                                     fontSize = 6.5.sp,
                                     color = BlueprintTextSecondary
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // =============================================================
+            // MMORPG-Style INTEGRATED VIRTUAL SHOP OVERLAY MODAL
+            // =============================================================
+            if (showIntegratedShop) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.85f))
+                        .clickable(enabled = true, onClick = {}) // block clicks underneath
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth(0.98f)
+                            .fillMaxHeight(0.96f)
+                            .border(1.5.dp, Color(0xFFFFD700), RoundedCornerShape(8.dp)), // Glowing gold border for merchant shop
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(6.dp)
+                        ) {
+                            // Header Row
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🏪", fontSize = 14.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Column {
+                                        Text(
+                                            text = "LOJA VIRTUAL INTEGRADA JIUVERSE",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFFFD700) // Gold
+                                        )
+                                        Text(
+                                            text = "Comerciante Credenciado • Cosméticos, Skins e Promoções",
+                                            fontSize = 6.5.sp,
+                                            color = BlueprintTextSecondary
+                                        )
+                                    }
+                                }
+
+                                // Interactive Wallet Balances
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                                            .border(0.5.dp, BlueprintGridLine, RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                                    ) {
+                                        Text("🪙", fontSize = 9.sp)
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Text(
+                                            text = "$shopWalletJiCoins JC",
+                                            fontSize = 7.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = BlueprintTeal,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                                            .border(0.5.dp, BlueprintGridLine, RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                                    ) {
+                                        Text("💎", fontSize = 9.sp)
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Text(
+                                            text = "$shopWalletJiuGems JG",
+                                            fontSize = 7.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = BlueprintOrange,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+
+                                    // Close button
+                                    Box(
+                                        modifier = Modifier
+                                            .size(18.dp)
+                                            .background(Color(0xFFEF4444).copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                            .border(0.5.dp, Color(0xFFEF4444), RoundedCornerShape(4.dp))
+                                            .clickable { showIntegratedShop = false }
+                                            .padding(1.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("✕", color = Color(0xFFF87171), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            Divider(color = BlueprintGridLine, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 4.dp))
+
+                            // CATEGORY CHANGER TABS
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                listOf(
+                                    "DESTAQUES" to "⭐ Destaques",
+                                    "PROMOCOES" to "🔥 Promoções",
+                                    "COSMETICOS" to "🎨 Cosméticos",
+                                    "AVATARES" to "🎭 Avatares"
+                                ).forEach { (key, titleName) ->
+                                    val isSelected = shopActiveCategory == key
+                                    val activeColor = when (key) {
+                                        "DESTAQUES" -> Color(0xFFFFD700)
+                                        "PROMOCOES" -> Color(0xFFEF4444)
+                                        "COSMETICOS" -> BlueprintTeal
+                                        else -> BlueprintCyan
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .background(
+                                                if (isSelected) activeColor.copy(alpha = 0.15f) else Color.Transparent, 
+                                                RoundedCornerShape(4.dp)
+                                            )
+                                            .border(
+                                                0.5.dp, 
+                                                if (isSelected) activeColor else BlueprintGridLine, 
+                                                RoundedCornerShape(4.dp)
+                                            )
+                                            .clickable { shopActiveCategory = key }
+                                            .padding(vertical = 4.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = titleName,
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) activeColor else BlueprintTextSecondary
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            // ITEM GRID LIST
+                            val displayedItems = integratedShopItems.filter { it.category == shopActiveCategory }
+                            
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                               displayedItems.forEach { item ->
+                                   Card(
+                                       modifier = Modifier
+                                           .width(118.dp)
+                                           .fillMaxHeight()
+                                           .border(0.5.dp, if (item.isPurchased) BlueprintGridLine else item.labelColor.copy(alpha = 0.6f), RoundedCornerShape(6.dp)),
+                                       colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1527)),
+                                       shape = RoundedCornerShape(6.dp)
+                                   ) {
+                                       Column(
+                                           modifier = Modifier
+                                               .fillMaxSize()
+                                               .padding(4.dp),
+                                           verticalArrangement = Arrangement.SpaceBetween
+                                       ) {
+                                           // Label badge
+                                           Row(
+                                               modifier = Modifier.fillMaxWidth(),
+                                               horizontalArrangement = Arrangement.SpaceBetween,
+                                               verticalAlignment = Alignment.CenterVertically
+                                           ) {
+                                               Box(
+                                                   modifier = Modifier
+                                                       .background(item.labelColor.copy(alpha = 0.2f), RoundedCornerShape(2.dp))
+                                                       .border(0.5.dp, item.labelColor, RoundedCornerShape(2.dp))
+                                                       .padding(horizontal = 3.dp, vertical = 1.dp)
+                                               ) {
+                                                   Text(
+                                                       text = item.labelText ?: "ITEM",
+                                                       fontSize = 5.5.sp,
+                                                       color = item.labelColor,
+                                                       fontWeight = FontWeight.ExtraBold
+                                                   )
+                                               }
+                                               
+                                               if (item.originalPrice != null) {
+                                                   Text(
+                                                       text = "${item.originalPrice} ${item.currency}",
+                                                       fontSize = 5.5.sp,
+                                                       color = BlueprintTextSecondary,
+                                                       textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
+                                                   )
+                                               }
+                                           }
+
+                                           // Avatar emoji glow
+                                           Box(
+                                               modifier = Modifier
+                                                   .size(36.dp)
+                                                   .align(Alignment.CenterHorizontally)
+                                                   .background(item.labelColor.copy(alpha = 0.1f), CircleShape)
+                                                   .border(0.5.dp, item.labelColor.copy(alpha = 0.3f), CircleShape),
+                                               contentAlignment = Alignment.Center
+                                           ) {
+                                               Text(item.iconEmoji, fontSize = 20.sp)
+                                           }
+
+                                           // Title and description
+                                           Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                               Text(
+                                                   text = item.name,
+                                                   fontSize = 7.5.sp,
+                                                   fontWeight = FontWeight.Bold,
+                                                   color = Color.White,
+                                                   textAlign = TextAlign.Center,
+                                                   maxLines = 1
+                                               )
+                                               Spacer(modifier = Modifier.height(1.dp))
+                                               Text(
+                                                   text = item.description,
+                                                   fontSize = 6.sp,
+                                                   color = BlueprintTextSecondary,
+                                                   textAlign = TextAlign.Center,
+                                                   lineHeight = 7.sp,
+                                                   maxLines = 2
+                                               )
+                                           }
+
+                                           // Buy action
+                                           Column {
+                                               Row(
+                                                   modifier = Modifier.fillMaxWidth(),
+                                                   horizontalArrangement = Arrangement.Center,
+                                                   verticalAlignment = Alignment.CenterVertically
+                                               ) {
+                                                   Text(
+                                                       text = if (item.isPurchased) "ADQUIRIDO" else "${item.price} ${item.currency}",
+                                                       fontSize = 8.sp,
+                                                       fontWeight = FontWeight.Bold,
+                                                       color = if (item.isPurchased) BlueprintTextSecondary else if (item.currency == "🪙") BlueprintTeal else BlueprintOrange,
+                                                       fontFamily = FontFamily.Monospace
+                                                   )
+                                               }
+                                               
+                                               Spacer(modifier = Modifier.height(2.dp))
+
+                                               Button(
+                                                   onClick = {
+                                                       if (!item.isPurchased) {
+                                                           handleShopBuyItem(item)
+                                                       }
+                                                   },
+                                                   enabled = !item.isPurchased,
+                                                   colors = ButtonDefaults.buttonColors(
+                                                       containerColor = if (item.isPurchased) Color.DarkGray else item.labelColor,
+                                                       disabledContainerColor = Color.DarkGray.copy(alpha = 0.5f)
+                                                   ),
+                                                   contentPadding = PaddingValues(0.dp),
+                                                   modifier = Modifier
+                                                       .fillMaxWidth()
+                                                       .height(16.dp),
+                                                   shape = RoundedCornerShape(4.dp)
+                                               ) {
+                                                   Text(
+                                                       text = if (item.isPurchased) "EQUIPADO" else "ADQUIRIR",
+                                                       fontSize = 7.sp,
+                                                       fontWeight = FontWeight.Black,
+                                                       color = if (item.isPurchased) BlueprintTextSecondary else Color.Black
+                                                   )
+                                               }
+                                           }
+                                       }
+                                   }
+                               }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "🔒 Transação nativa síncrona segura. Gateways externos (Stripe ID, Mercado Pago, PIX API) em standby.",
+                                fontSize = 6.sp,
+                                color = BlueprintTeal,
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // =============================================================
+            // MMORPG-Style Inventory Overlay Modal Window
+            // =============================================================
+            if (showMmorpgInventory) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.82f))
+                        .clickable(enabled = true, onClick = {}) // block clicks underneath
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth(0.96f)
+                            .fillMaxHeight(0.94f)
+                            .border(1.5.dp, BlueprintOrange, RoundedCornerShape(8.dp)),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(6.dp)
+                        ) {
+                            // Title bar with close button
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("🎒", fontSize = 15.sp)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Column {
+                                            Text(
+                                                text = "JIUVERSE RPG INVENTÁRIO COCKPIT",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = BlueprintOrange,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                            Text(
+                                                text = "SQLite Direct Sync • Atleta: ${playerMemory.playerName}",
+                                                fontSize = 7.sp,
+                                                color = BlueprintTextSecondary
+                                            )
+                                        }
+                                    }
+
+                                // Close button
+                                Box(
+                                    modifier = Modifier
+                                        .size(22.dp)
+                                        .background(Color(0xFFEF4444).copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                        .border(0.5.dp, Color(0xFFEF4444), RoundedCornerShape(4.dp))
+                                        .clickable { showMmorpgInventory = false }
+                                        .padding(2.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("✕", color = Color(0xFFF87171), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            Divider(color = BlueprintGridLine, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 4.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                // LEFT SIDE PANEL: Tab buttons menu in RPG-style vertical lists
+                                Column(
+                                    modifier = Modifier
+                                        .weight(0.28f)
+                                        .fillMaxHeight()
+                                        .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                                        .padding(4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    val mmorpgTabs = listOf(
+                                        Triple("🎒 ITENS", 0, BlueprintCyan),
+                                        Triple("💄 COSMÉTICOS", 1, Color(0xFFF472B6)),
+                                        Triple("🏆 CONQUISTAS", 2, BlueprintOrange),
+                                        Triple("🛡️ EQUIPAM.", 3, BlueprintTeal)
+                                    )
+
+                                    mmorpgTabs.forEach { (title, idx, accentColor) ->
+                                        val isSelected = mmorpgActiveTab == idx
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    if (isSelected) accentColor.copy(alpha = 0.15f) else Color.Transparent,
+                                                    RoundedCornerShape(4.dp)
+                                                )
+                                                .border(
+                                                    0.5.dp,
+                                                    if (isSelected) accentColor else Color.Transparent,
+                                                    RoundedCornerShape(4.dp)
+                                                )
+                                                .clickable { mmorpgActiveTab = idx }
+                                                .padding(vertical = 6.dp, horizontal = 5.dp)
+                                        ) {
+                                            Text(
+                                                text = title,
+                                                fontSize = 7.5.sp,
+                                                fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
+                                                color = if (isSelected) accentColor else BlueprintTextSecondary,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.weight(1f))
+
+                                    // Status summary of the player
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color(0xFF1E293B), RoundedCornerShape(4.dp))
+                                            .padding(4.dp)
+                                    ) {
+                                        Text("ESTATÍSTICAS", fontSize = 6.sp, fontWeight = FontWeight.Black, color = BlueprintOrange)
+                                        Text("Faixa: ${playerMemory.playerBelt}", fontSize = 6.sp, color = BlueprintTextPrimary)
+                                        Text("Nível: ${playerMemory.playerLevel}", fontSize = 6.sp, color = BlueprintTextPrimary)
+                                        Text("Estilo: ${playerMemory.favoriteStyle}", fontSize = 6.sp, color = BlueprintTextSecondary)
+                                    }
+                                }
+
+                                // RIGHT SIDE PANEL: Content viewport of selected tab
+                                Column(
+                                    modifier = Modifier
+                                        .weight(0.72f)
+                                        .fillMaxHeight()
+                                        .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                        .border(0.5.dp, BlueprintGridLine, RoundedCornerShape(6.dp))
+                                        .padding(6.dp)
+                                ) {
+                                    when (mmorpgActiveTab) {
+                                        0 -> { // TAB ITENS
+                                            Text(
+                                                text = "Mochila Compartilhada de Insumos & Chaves",
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = BlueprintCyan
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+
+                                            Row(
+                                                modifier = Modifier.weight(1f),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                // Left Scrollable / Grid items
+                                                Column(
+                                                    modifier = Modifier
+                                                        .weight(1.2f)
+                                                        .fillMaxHeight()
+                                                        .verticalScroll(rememberScrollState()),
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    inventoryItems.forEach { item ->
+                                                        val isSel = selectedInventoryItemId == item.id
+                                                        Row(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .background(
+                                                                    if (isSel) Color(0xFF1B3B4B) else Color(0xFF0F172A),
+                                                                    RoundedCornerShape(4.dp)
+                                                                )
+                                                                .border(
+                                                                    0.5.dp,
+                                                                    if (isSel) BlueprintCyan else Color(0xFF334155),
+                                                                    RoundedCornerShape(4.dp)
+                                                                )
+                                                                .clickable { selectedInventoryItemId = item.id }
+                                                                .padding(4.dp),
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.SpaceBetween
+                                                        ) {
+                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                Text(item.icon, fontSize = 12.sp)
+                                                                Spacer(modifier = Modifier.width(4.dp))
+                                                                Text(
+                                                                    text = item.name.take(20),
+                                                                    fontSize = 7.5.sp,
+                                                                    color = BlueprintTextPrimary,
+                                                                    fontWeight = FontWeight.Bold
+                                                                )
+                                                            }
+                                                            Text("x${item.quantity}", fontSize = 7.5.sp, color = BlueprintTeal, fontWeight = FontWeight.Bold)
+                                                        }
+                                                    }
+                                                }
+
+                                                // Right panel of item details with ACTION item usage
+                                                val activeItem = inventoryItems.find { it.id == selectedInventoryItemId } ?: inventoryItems.firstOrNull()
+                                                Column(
+                                                    modifier = Modifier
+                                                        .weight(0.8f)
+                                                        .fillMaxHeight()
+                                                        .background(Color(0xFF0F172A), RoundedCornerShape(4.dp))
+                                                        .border(0.5.dp, BlueprintGridLine)
+                                                        .padding(4.dp),
+                                                    verticalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    if (activeItem != null) {
+                                                        Column {
+                                                            Text(activeItem.icon, fontSize = 18.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+                                                            Text(
+                                                                text = activeItem.name.uppercase(),
+                                                                fontSize = 7.5.sp,
+                                                                fontWeight = FontWeight.Black,
+                                                                color = BlueprintCyan,
+                                                                modifier = Modifier.padding(top = 2.dp)
+                                                            )
+                                                            Text(
+                                                                text = "Insumo de sparring virtual. Pode ser consumido para alterar buffers do grid sandbox.",
+                                                                fontSize = 6.sp,
+                                                                color = BlueprintTextSecondary,
+                                                                lineHeight = 7.5.sp
+                                                            )
+                                                        }
+
+                                                        // Consume button
+                                                        Button(
+                                                            onClick = {
+                                                                if (activeItem.quantity > 0) {
+                                                                    val idx = inventoryItems.indexOf(activeItem)
+                                                                    if (idx != -1) {
+                                                                        val nextQty = activeItem.quantity - 1
+                                                                        inventoryItems[idx] = activeItem.copy(quantity = nextQty)
+                                                                    }
+                                                                    recentDojoConsoleLog = "Consumiu '${activeItem.name}' via painel MMORPG! Sobraram: ${activeItem.quantity - 1}."
+                                                                    activeSpeechLabel = "Usou ${activeItem.icon} no Tatame!"
+                                                                } else {
+                                                                    recentDojoConsoleLog = "Sem estoque do item '${activeItem.name}'!"
+                                                                    activeSpeechLabel = "Preciso de mais ${activeItem.icon}!"
+                                                                }
+                                                            },
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .height(18.dp),
+                                                            colors = ButtonDefaults.buttonColors(containerColor = BlueprintCyan, contentColor = Color.Black),
+                                                            contentPadding = PaddingValues(0.dp)
+                                                        ) {
+                                                            Text("CONSUMIR", fontSize = 6.5.sp, fontWeight = FontWeight.Black)
+                                                        }
+                                                    } else {
+                                                        Text("Nenhum selecionado", fontSize = 7.sp, color = BlueprintTextSecondary)
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        1 -> { // TAB COSMETICOS
+                                            Text(
+                                                text = "Estilo & Visual do Avatar • Cosméticos Ativos",
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFF472B6)
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+
+                                            Row(
+                                                modifier = Modifier.weight(1f),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                // Grid of Cosmetics selector
+                                                Column(
+                                                    modifier = Modifier
+                                                        .weight(1.2f)
+                                                        .fillMaxHeight()
+                                                        .verticalScroll(rememberScrollState()),
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    mmorpgCosmetics.forEach { cosmetic ->
+                                                        val isEquipped = (cosmetic.category == "HAIR" && equippedHairId == cosmetic.id) ||
+                                                                (cosmetic.category == "PET" && equippedPetId == cosmetic.id)
+                                                        
+                                                        Row(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .background(Color(0xFF0F172A), RoundedCornerShape(4.dp))
+                                                                .border(
+                                                                    0.5.dp,
+                                                                    if (isEquipped) Color(0xFFF472B6) else Color(0xFF334155),
+                                                                    RoundedCornerShape(4.dp)
+                                                                )
+                                                                .clickable {
+                                                                    if (cosmetic.category == "HAIR") {
+                                                                        equippedHairId = cosmetic.id
+                                                                        equippedHelmet = cosmetic.name
+                                                                        recentDojoConsoleLog = "Alterou Penteado virtual para '${cosmetic.name}'"
+                                                                        activeSpeechLabel = "Visual atualizado: ${cosmetic.name}!"
+                                                                    } else if (cosmetic.category == "PET") {
+                                                                        equippedPetId = cosmetic.id
+                                                                        equippedRing = "Pingente do " + cosmetic.name
+                                                                        recentDojoConsoleLog = "Equipou companheiro de tatame '${cosmetic.name}'"
+                                                                        activeSpeechLabel = "Olha meu mascote ${cosmetic.name}!"
+                                                                    }
+                                                                }
+                                                                .padding(4.dp),
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.SpaceBetween
+                                                        ) {
+                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                Text(if (cosmetic.category == "HAIR") "💇" else "🐾", fontSize = 11.sp)
+                                                                Spacer(modifier = Modifier.width(4.dp))
+                                                                Text(
+                                                                    text = cosmetic.name,
+                                                                    fontSize = 7.5.sp,
+                                                                    color = BlueprintTextPrimary,
+                                                                    fontWeight = FontWeight.Bold
+                                                                )
+                                                            }
+                                                            
+                                                            if (isEquipped) {
+                                                                Text("EQUIPADO", fontSize = 6.5.sp, color = Color.Green, fontWeight = FontWeight.Bold)
+                                                            } else {
+                                                                Text(cosmetic.rarity, fontSize = 6.5.sp, color = cosmetic.rarityColor, fontWeight = FontWeight.Bold)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // Visual preview
+                                                Column(
+                                                    modifier = Modifier
+                                                        .weight(0.8f)
+                                                        .fillMaxHeight()
+                                                        .background(Color(0xFF0F172A), RoundedCornerShape(4.dp))
+                                                        .border(0.5.dp, BlueprintGridLine)
+                                                        .padding(4.dp),
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.Center
+                                                ) {
+                                                    Text("PREVIEW SOCIAL", fontSize = 7.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF472B6))
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(36.dp)
+                                                            .background(Color.Black, CircleShape)
+                                                            .border(1.dp, Color(0xFFF472B6), CircleShape),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text("🥋", fontSize = 18.sp)
+                                                    }
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text("CABEÇA: $equippedHelmet", fontSize = 6.sp, color = BlueprintTextPrimary)
+                                                    Text("PET: ${mmorpgCosmetics.find { it.id == equippedPetId }?.name ?: "Nenhum"}", fontSize = 6.sp, color = BlueprintTextSecondary)
+                                                }
+                                            }
+                                        }
+
+                                        2 -> { // TAB CONQUISTAS
+                                            Text(
+                                                text = "Títulos de Prestígio Permanentemente no Banco Room SQL",
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = BlueprintOrange
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+
+                                            val achievements = listOf(
+                                                Triple("🎖️ Guardeiro Focado", "favoriteStyle", "Especialista em " + playerMemory.favoriteStyle),
+                                                Triple("🏆 Dono do Dojo Itaim", "academyName", "Filiado à: " + playerMemory.academyName),
+                                                Triple("🥇 Graduado Federado", "playerBelt", "Atestado com a Faixa: " + playerMemory.playerBelt + " (Nível " + playerMemory.playerLevel + ")"),
+                                                Triple("🏅 Resiliência Estelar", "totalTrainingMinutes", "Acumulou " + playerMemory.totalTrainingMinutes + " minutos oficiais em combate"),
+                                                Triple("⭐ Rep de Honra", "masterReputation", "Reputação atestada de " + playerMemory.masterReputation + " pts concedidos por Mestres")
+                                            )
+
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .verticalScroll(rememberScrollState()),
+                                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                achievements.forEach { (title, key, desc) ->
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .background(Color(0xFF1E293B), RoundedCornerShape(4.dp))
+                                                            .border(0.5.dp, BlueprintOrange.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                                            .padding(5.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
+                                                        Column {
+                                                            Text(title, fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = BlueprintTextPrimary)
+                                                            Text(desc, fontSize = 6.5.sp, color = BlueprintTextSecondary)
+                                                        }
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .background(Color(0xFF0F52BA).copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                                                .border(0.5.dp, Color(0xFF0F52BA), RoundedCornerShape(4.dp))
+                                                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                                        ) {
+                                                            Text("ROOM VERIFICADO", fontSize = 5.sp, fontWeight = FontWeight.ExtraBold, color = BlueprintCyan)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        3 -> { // TAB EQUIPAMENTOS
+                                            Text(
+                                                text = "Equipamentos de Atributos & Vestimentas Licenciadas",
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = BlueprintTeal
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+
+                                            Row(
+                                                modifier = Modifier.fillMaxSize(),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                // Equipmentslots paperdoll grid
+                                                Column(
+                                                    modifier = Modifier
+                                                        .weight(1.1f)
+                                                        .fillMaxHeight(),
+                                                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                                                ) {
+                                                    val equipments = listOf(
+                                                        Triple("👑 CABEÇA", equippedHelmet, "CABEÇA"),
+                                                        Triple("🥋 VESTUÁRIO (GI)", equippedGi, "VESTUÁRIO"),
+                                                        Triple("🎗️ CINTURA", equippedBelt, "CINTURA"),
+                                                        Triple("💍 ACESSÓRIO", equippedRing, "ACESSÓRIO")
+                                                    )
+
+                                                    equipments.forEach { (slotName, activeEquip, slotType) ->
+                                                        Row(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .background(Color(0xFF0D1527), RoundedCornerShape(4.dp))
+                                                                .border(0.5.dp, BlueprintTeal.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                                                                .clickable {
+                                                                    if (slotType == "VESTUÁRIO") {
+                                                                        equippedGi = if (equippedGi.contains("Armadura")) "Rashguard de Competição" else "Kimono Armadura Negra"
+                                                                        recentDojoConsoleLog = "Trocou armadura de kimono para: $equippedGi"
+                                                                    } else if (slotType == "CINTURA") {
+                                                                        equippedBelt = if (equippedBelt.contains("Holográfica")) "Faixa Coral de Grande Mestre" else "Faixa Preta Holográfica"
+                                                                        recentDojoConsoleLog = "Trocou faixa ativa do avatar para: $equippedBelt"
+                                                                    } else if (slotType == "CABEÇA") {
+                                                                        equippedHelmet = if (equippedHelmet.contains("Samurai")) "Cabelo Super Saiyajin" else "Coque Samurai"
+                                                                        recentDojoConsoleLog = "Trocou elmo/penteado eSports para: $equippedHelmet"
+                                                                    } else if (slotType == "ACESSÓRIO") {
+                                                                        equippedRing = if (equippedRing.contains("Chave")) "Pingente da Capivara Sábia" else "Chave Cósmica Ring"
+                                                                        recentDojoConsoleLog = "Ajustou talismã mágico para: $equippedRing"
+                                                                    }
+                                                                    activeSpeechLabel = "Equipamento alterado em tempo real!"
+                                                                }
+                                                                .padding(4.dp),
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.SpaceBetween
+                                                        ) {
+                                                            Column {
+                                                                Text(slotName, fontSize = 6.sp, fontWeight = FontWeight.Bold, color = BlueprintTeal)
+                                                                Text(activeEquip, fontSize = 7.5.sp, color = BlueprintTextPrimary)
+                                                            }
+                                                            Text("🔄 CYCLE", fontSize = 6.sp, color = BlueprintTextSecondary, fontWeight = FontWeight.Bold)
+                                                        }
+                                                    }
+                                                }
+
+                                                // Legend and Stats description of equipped gear
+                                                Column(
+                                                    modifier = Modifier
+                                                        .weight(0.9f)
+                                                        .fillMaxHeight()
+                                                        .background(Color(0xFF132D28), RoundedCornerShape(4.dp))
+                                                        .border(0.5.dp, BlueprintTeal)
+                                                        .padding(5.dp),
+                                                    verticalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Column {
+                                                        Text("PODER TOTAL", fontSize = 6.sp, fontWeight = FontWeight.Black, color = BlueprintTeal)
+                                                        Text("⚔️ ATK: +250 XP Boost", fontSize = 7.sp, fontWeight = FontWeight.Bold, color = BlueprintTextPrimary)
+                                                        Text("🛡️ DEF: +480 Resist", fontSize = 7.sp, fontWeight = FontWeight.Bold, color = BlueprintTextPrimary)
+                                                        Text("🌟 REFP: +99 Sensei", fontSize = 7.sp, fontWeight = FontWeight.Bold, color = BlueprintTextPrimary)
+                                                    }
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = "Equipamento certificado por Smart Contracts locais. Altere ciclando os slots ao lado.",
+                                                        fontSize = 6.sp,
+                                                        color = BlueprintTextSecondary
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1057,4 +1989,5 @@ fun LandscapeSandboxTab(
 
         Spacer(modifier = Modifier.height(20.dp))
     }
+}
 }
