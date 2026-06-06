@@ -124,6 +124,9 @@ interface GymStudentDao {
     @Query("SELECT * FROM gym_students WHERE academyId = :academyId ORDER BY name ASC")
     fun getStudentsForAcademy(academyId: Int): Flow<List<GymStudentEntity>>
 
+    @Query("SELECT * FROM gym_students ORDER BY name ASC")
+    fun getAllStudents(): Flow<List<GymStudentEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertStudent(student: GymStudentEntity)
 
@@ -202,6 +205,7 @@ class SenseiRepository(private val db: SenseiRoomDatabase) {
     val chatHistory: Flow<List<SenseiChatMessageEntity>> = senseiChatMessageDao.getAllMessages()
     val allAcademies: Flow<List<RealAcademyEntity>> = realAcademyDao.getAllAcademies()
     val allTournaments: Flow<List<AcademyTournamentEntity>> = academyTournamentDao.getAllTournaments()
+    val allStudents: Flow<List<GymStudentEntity>> = gymStudentDao.getAllStudents()
 
     suspend fun getPlayerMemoryDirect(): PlayerMemoryEntity {
         return playerMemoryDao.getPlayerMemoryDirect() ?: PlayerMemoryEntity()

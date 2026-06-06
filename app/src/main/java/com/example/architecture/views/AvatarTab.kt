@@ -103,6 +103,7 @@ fun AvatarTab(
             CustomizableOption("h4", "Super Saiyajin Aurum", "HAIR", "MÍTICO", Color(0xFFEF4444), Color(0xFFFACC15)),
 
             // Beard
+            CustomizableOption("b0", "Sem Barba (Limpo)", "BEARD", "COMUM", BlueprintTeal, Color.Transparent),
             CustomizableOption("b1", "Barba Cheia Lenhador", "BEARD", "COMUM", BlueprintTeal, Color(0xFF3B2314)),
             CustomizableOption("b2", "Cavanhaque Old School", "BEARD", "COMUM", BlueprintTeal, Color(0xFF1F1F1F)),
             CustomizableOption("b3", "Barba de Mestre Longa Branca", "BEARD", "LENDÁRIO", BlueprintOrange, Color(0xFFE0E0E0)),
@@ -111,6 +112,7 @@ fun AvatarTab(
             CustomizableOption("u1", "Kimono Alliance Branco Clássico", "UNIFORM", "COMUM", BlueprintTeal, Color(0xFFE5E7EB)),
             CustomizableOption("u2", "Rashguard Samurai de Competição", "UNIFORM", "ÉPICO", Color(0xFFA855F7), Color(0xFF1E293B)),
             CustomizableOption("u3", "Kimono Armadura Negra de Ouro", "UNIFORM", "MÍTICO", Color(0xFFEF4444), Color(0xFF0F172A)),
+            CustomizableOption("u4", "Kimono Azul Escuro Competidor", "UNIFORM", "COMUM", BlueprintTeal, Color(0xFF1E3A8A)),
 
             // Belts (Faixas)
             CustomizableOption("f1", "Faixa Branca Iniciante", "BELT", "COMUM", BlueprintTeal, Color(0xFFF3F4F6)),
@@ -124,6 +126,7 @@ fun AvatarTab(
             CustomizableOption("a1", "Bandagem Esportiva de Dedos", "ACCESSORY", "COMUM", BlueprintTeal, Color(0xFFF3F4F6)),
             CustomizableOption("a2", "Protetor de Orelha de Silicone", "ACCESSORY", "RARO", BlueprintCyan, Color(0xFF06B6D4)),
             CustomizableOption("a3", "Óculos Escuros Estilo Rickson", "ACCESSORY", "LENDÁRIO", BlueprintOrange, Color(0xFF1E293B)),
+            CustomizableOption("a4", "Luvas de Treino de Grappling", "ACCESSORY", "COMUM", BlueprintTeal, Color(0xFFEF4444), description = "Proteção esportiva de pulso/dedos de alta performance."),
 
             // Emotes
             CustomizableOption("e1", "Emote: Cumprimentar 'Oss!'", "EMOTE", "COMUM", BlueprintTeal, description = "Sinal de respeito sincero de kimono."),
@@ -137,17 +140,18 @@ fun AvatarTab(
     }
 
     // 2. Active equipped items state
-    var activeSkin by remember { mutableStateOf(customizableItems[0]) }
-    var activeHair by remember { mutableStateOf(customizableItems[3]) }
-    var activeBeard by remember { mutableStateOf(customizableItems[7]) }
-    var activeUniform by remember { mutableStateOf(customizableItems[10]) }
-    var activeBelt by remember { mutableStateOf(customizableItems[14]) } // Start with Black Belt
-    var activeAccessory by remember { mutableStateOf(customizableItems[16]) }
-    var activeEmote by remember { mutableStateOf(customizableItems[19]) }
-    var activePet by remember { mutableStateOf(customizableItems[21]) } // Capivara
+    var activeSkin by remember { mutableStateOf(customizableItems.first { it.id == "s1" }) }
+    var activeHair by remember { mutableStateOf(customizableItems.first { it.id == "h1" }) }
+    var activeBeard by remember { mutableStateOf(customizableItems.first { it.id == "b0" }) }
+    var activeUniform by remember { mutableStateOf(customizableItems.first { it.id == "u4" }) }
+    var activeBelt by remember { mutableStateOf(customizableItems.first { it.id == "f2" }) } 
+    var activeAccessory by remember { mutableStateOf(customizableItems.first { it.id == "a4" }) }
+    var activeEmote by remember { mutableStateOf(customizableItems.first { it.id == "e1" }) }
+    var activePet by remember { mutableStateOf(customizableItems.first { it.id == "p2" }) } // Default Capivara
 
     // Dynamic animation triggers
-    var currentAnimationState by remember { mutableStateOf("IDLE") } // "IDLE", "SHRUG", "OSS_BOW", "SPARRING"
+    var currentAnimationState by remember { mutableStateOf("IDLE") } // "IDLE", "WALK", "RUN"
+    var activeDirection by remember { mutableStateOf("FRENTE") } // "FRENTE", "COSTAS", "ESQUERDA", "DIREITA"
     val infiniteTransition = rememberInfiniteTransition()
     
     // Smooth idle scale simulator
@@ -156,6 +160,16 @@ fun AvatarTab(
         targetValue = 1.04f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = { it }),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+
+    // Walk frame oscillation
+    val walkFrame by infiniteTransition.animateFloat(
+        initialValue = -1.0f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(500, easing = { it }),
             repeatMode = RepeatMode.Reverse
         )
     )
@@ -217,7 +231,7 @@ fun AvatarTab(
             
             // Left Half: Avatar Preview Engine (Interactive canvas simulation)
             Card(
-                modifier = Modifier.weight(0.9f),
+                modifier = Modifier.weight(1.0f),
                 colors = CardDefaults.cardColors(containerColor = BlueprintCard),
                 border = CardDefaults.outlinedCardBorder()
             ) {
@@ -225,14 +239,43 @@ fun AvatarTab(
                     modifier = Modifier.padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("PRÉVIEW EM TEMPO REAL", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = BlueprintCyan)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("JiuVerse ORIGINAL CHIP PROTOTYPE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = BlueprintCyan)
+                    Text("Pixel Art 2.5D Isometric (Habbo Style)", fontSize = 8.sp, color = BlueprintTextSecondary)
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Angle / Direction selector row (Frente, Costas, Lado esquerdo, Lado direito)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        listOf(
+                            "FRENTE" to "FRENTE",
+                            "COSTAS" to "COSTAS",
+                            "ESQUERDA" to "ESQ (2.5D)",
+                            "DIREITA" to "DIR (2.5D)"
+                        ).forEach { (dir, label) ->
+                            val isSelected = activeDirection == dir
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(if (isSelected) BlueprintCyan.copy(alpha = 0.25f) else Color(0xFF1E293B), RoundedCornerShape(4.dp))
+                                    .border(0.5.dp, if (isSelected) BlueprintCyan else BlueprintGridLine, RoundedCornerShape(4.dp))
+                                    .clickable { activeDirection = dir }
+                                    .padding(vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(label, fontSize = 8.sp, fontWeight = FontWeight.Black, color = if (isSelected) BlueprintCyan else BlueprintTextSecondary)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     // Simulated 2D Isometric Character drawing canvas
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp)
+                            .height(210.dp)
                             .background(Color.Black, RoundedCornerShape(4.dp))
                             .border(0.5.dp, BlueprintGridLine, RoundedCornerShape(4.dp)),
                         contentAlignment = Alignment.Center
@@ -244,93 +287,706 @@ fun AvatarTab(
                                 .align(Alignment.Center)
                         ) {
                             val centerWidth = size.width / 2
-                            val breathOffset = (breathScale - 1.0f) * 40f
-
-                            // 1. Draw head background with selected skin color
-                            drawCircle(
-                                color = activeSkin.hexValue,
-                                radius = 42f + (breathOffset * 0.1f),
-                                center = androidx.compose.ui.geometry.Offset(centerWidth, size.height / 2 - 30f)
-                            )
-
-                            // 2. Draw hair if not bald
-                            if (activeHair.id != "h2") {
-                                drawArc(
-                                    color = activeHair.hexValue,
-                                    startAngle = 180f,
-                                    sweepAngle = 180f,
-                                    useCenter = true,
-                                    size = androidx.compose.ui.geometry.Size(100f, 100f),
-                                    topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 50f, size.height / 2 - 85f)
-                                )
+                            val centerHeight = size.height / 2
+                            
+                            // Smooth idle bounce or walk bounce
+                            val bounceY = if (currentAnimationState == "RUN") {
+                                kotlin.math.abs(walkFrame) * 8f - 4f
+                            } else if (currentAnimationState == "WALK") {
+                                kotlin.math.abs(walkFrame) * 4f - 2f
+                            } else {
+                                (breathScale - 1.0f) * 60f
+                            }
+                            
+                            val bodyLeanX = if (currentAnimationState == "RUN") {
+                                5f
+                            } else {
+                                0f
                             }
 
-                            // 3. Draw Beard
-                            drawArc(
-                                color = activeBeard.hexValue,
-                                startAngle = 0f,
-                                sweepAngle = 180f,
-                                useCenter = true,
-                                size = androidx.compose.ui.geometry.Size(86f, 86f),
-                                topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 43f, size.height / 2 - 40f)
+                            // Ground footprint shadow
+                            drawOval(
+                                color = Color(0x3F000000),
+                                size = androidx.compose.ui.geometry.Size(90f, 20f),
+                                topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 45f, centerHeight + 65f)
                             )
 
-                            // 4. Eyes (Simple vector)
-                            drawCircle(
-                                color = Color.White,
-                                radius = 6f,
-                                center = androidx.compose.ui.geometry.Offset(centerWidth - 14f, size.height / 2 - 35f)
-                            )
-                            drawCircle(
-                                color = Color.Black,
-                                radius = 3f,
-                                center = androidx.compose.ui.geometry.Offset(centerWidth - 14f, size.height / 2 - 35f)
-                            )
+                            // Active customizer options mapped to palette colors dynamically
+                            val colSkin = activeSkin.hexValue
+                            val colHair = if (activeHair.id == "h2") Color.Transparent else activeHair.hexValue
+                            val colUniform = activeUniform.hexValue
+                            val colBelt = activeBelt.hexValue
+                            val colBeard = activeBeard.hexValue
 
-                            drawCircle(
-                                color = Color.White,
-                                radius = 6f,
-                                center = androidx.compose.ui.geometry.Offset(centerWidth + 14f, size.height / 2 - 35f)
-                            )
-                            drawCircle(
-                                color = Color.Black,
-                                radius = 3f,
-                                center = androidx.compose.ui.geometry.Offset(centerWidth + 14f, size.height / 2 - 35f)
-                            )
+                            val colPreto = Color(0xFF1E293B)
+                            val colBranco = Color(0xFFF8FAFC)
+                            val colVermelho = Color(0xFFEF4444)
+                            val colCinzaGrafite = Color(0xFF475569)
 
-                            // 5. Draw Uniform / Kimono collar
-                            drawRect(
-                                color = activeUniform.hexValue,
-                                size = androidx.compose.ui.geometry.Size(90f, 100f),
-                                topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 45f, size.height / 2 + 10f)
-                            )
+                            when (activeDirection) {
+                                "FRENTE" -> {
+                                    val headY = centerHeight - 35f + bounceY
+                                    val headX = centerWidth + bodyLeanX
 
-                            // 6. Draw Belt Overlay
-                            drawRect(
-                                color = activeBelt.hexValue,
-                                size = androidx.compose.ui.geometry.Size(96f, 18f),
-                                topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 48f, size.height / 2 + 65f)
-                            )
-                            
-                            // Belt tag (The black sleeve of BJJ belts)
-                            drawRect(
-                                color = if (activeBelt.id == "f1") Color.Black else Color.Black,
-                                size = androidx.compose.ui.geometry.Size(26f, 18f),
-                                topLeft = androidx.compose.ui.geometry.Offset(centerWidth + 15f, size.height / 2 + 65f)
-                            )
-                            // White/Coral tips for rank
-                            drawRect(
-                                color = if (activeBelt.id == "f1") Color.White else Color.Red,
-                                size = androidx.compose.ui.geometry.Size(8f, 18f),
-                                topLeft = androidx.compose.ui.geometry.Offset(centerWidth + 20f, size.height / 2 + 65f)
-                            )
+                                    // 1. HEAD (Slightly larger, Habbo style)
+                                    drawRoundRect(
+                                        color = colSkin,
+                                        size = androidx.compose.ui.geometry.Size(62f, 62f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(headX - 31f, headY - 31f),
+                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f, 16f)
+                                    )
 
-                            // Ring to indicate safe WebRTC spatial sphere
+                                    // 2. HAIR (Short black hair or dynamic styles)
+                                    if (activeHair.id != "h2") {
+                                        // Base hair caps
+                                        drawRect(
+                                            color = colHair,
+                                            size = androidx.compose.ui.geometry.Size(64f, 20f),
+                                            topLeft = androidx.compose.ui.geometry.Offset(headX - 32f, headY - 32f)
+                                        )
+                                        drawRect(
+                                            color = colHair,
+                                            size = androidx.compose.ui.geometry.Size(12f, 10f),
+                                            topLeft = androidx.compose.ui.geometry.Offset(headX - 28f, headY - 12f)
+                                        )
+                                        drawRect(
+                                            color = colHair,
+                                            size = androidx.compose.ui.geometry.Size(12f, 10f),
+                                            topLeft = androidx.compose.ui.geometry.Offset(headX + 16f, headY - 12f)
+                                        )
+
+                                        // Special Coque Samurai Dojo "h3"
+                                        if (activeHair.id == "h3") {
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(20f, 20f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX - 10f, headY - 48f)
+                                            )
+                                        }
+
+                                        // Special Super Saiyajin "h4" spikes
+                                        if (activeHair.id == "h4") {
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(14f, 22f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX - 20f, headY - 46f)
+                                            )
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(14f, 28f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX - 7f, headY - 52f)
+                                            )
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(14f, 22f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX + 6f, headY - 46f)
+                                            )
+                                        }
+                                    }
+
+                                    // 3. EYES & FACE (Expressive minimalist eyes, cheek blush, smile)
+                                    drawRect(
+                                        color = Color.White,
+                                        size = androidx.compose.ui.geometry.Size(12f, 12f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(headX - 18f, headY - 2f)
+                                    )
+                                    drawRect(
+                                        color = Color.Black,
+                                        size = androidx.compose.ui.geometry.Size(6f, 12f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(headX - 15f, headY - 2f)
+                                    )
+
+                                    drawRect(
+                                        color = Color.White,
+                                        size = androidx.compose.ui.geometry.Size(12f, 12f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(headX + 6f, headY - 2f)
+                                    )
+                                    drawRect(
+                                        color = Color.Black,
+                                        size = androidx.compose.ui.geometry.Size(6f, 12f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(headX + 9f, headY - 2f)
+                                    )
+
+                                    // Rose cheek blush
+                                    drawCircle(
+                                        color = Color(0xFFFDA4AF).copy(alpha = 0.8f),
+                                        radius = 5f,
+                                        center = androidx.compose.ui.geometry.Offset(headX - 22f, headY + 14f)
+                                    )
+                                    drawCircle(
+                                        color = Color(0xFFFDA4AF).copy(alpha = 0.8f),
+                                        radius = 5f,
+                                        center = androidx.compose.ui.geometry.Offset(headX + 22f, headY + 14f)
+                                    )
+
+                                    // Friendly Smile
+                                    drawRect(
+                                        color = Color(0xFFE11D48),
+                                        size = androidx.compose.ui.geometry.Size(12f, 3f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(headX - 6f, headY + 16f)
+                                    )
+
+                                    // Dynamic Beard Layer if equipped
+                                    if (activeBeard.id != "b0") {
+                                        drawRect(
+                                            color = colBeard,
+                                            size = androidx.compose.ui.geometry.Size(62f, 14f),
+                                            topLeft = androidx.compose.ui.geometry.Offset(headX - 31f, headY + 17f)
+                                        )
+                                        drawRect(
+                                            color = colBeard,
+                                            size = androidx.compose.ui.geometry.Size(36f, 6f),
+                                            topLeft = androidx.compose.ui.geometry.Offset(headX - 18f, headY + 11f)
+                                        )
+                                    }
+
+                                    // 4. BODY / UNIFORM (Sport white rashguard/kimono jacket with black side stripes and red center crest badge)
+                                    val bodyY = centerHeight + 25f + (bounceY * 0.4f)
+                                    
+                                    // Primary jacket color
+                                    drawRect(
+                                        color = colUniform,
+                                        size = androidx.compose.ui.geometry.Size(80f, 40f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 40f, bodyY)
+                                    )
+                                    // Side panels (high contrast black compression trim)
+                                    drawRect(
+                                        color = colPreto,
+                                        size = androidx.compose.ui.geometry.Size(12f, 40f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 40f, bodyY)
+                                    )
+                                    drawRect(
+                                        color = colPreto,
+                                        size = androidx.compose.ui.geometry.Size(12f, 40f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth + 28f, bodyY)
+                                    )
+                                    // Red training crest badge
+                                    drawCircle(
+                                        color = colVermelho,
+                                        radius = 8f,
+                                        center = androidx.compose.ui.geometry.Offset(centerWidth, bodyY + 18f)
+                                    )
+
+                                    // Dynamic Arms with Training Gloves (Glove colors are bound to accessories option)
+                                    val leftArmSwingY = if (currentAnimationState == "WALK" || currentAnimationState == "RUN") walkFrame * 8f else 0f
+                                    val rtArmSwingY = if (currentAnimationState == "WALK" || currentAnimationState == "RUN") -walkFrame * 8f else 0f
+                                    val hasGloves = activeAccessory.id == "a4"
+                                    val leftHandColor = if (hasGloves) activeAccessory.hexValue else if (activeAccessory.id == "a1") Color.White else colSkin
+                                    val rightHandColor = if (hasGloves) activeAccessory.hexValue else if (activeAccessory.id == "a1") Color.White else colSkin
+
+                                    // Left Arm / Sleeve
+                                    drawRect(
+                                        color = colUniform,
+                                        size = androidx.compose.ui.geometry.Size(14f, 22f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 52f, bodyY + 4f + leftArmSwingY)
+                                    )
+                                    // Left Hand/Glove
+                                    drawRect(
+                                        color = leftHandColor,
+                                        size = androidx.compose.ui.geometry.Size(14f, 14f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 52f, bodyY + 26f + leftArmSwingY)
+                                    )
+
+                                    // Right Arm / Sleeve
+                                    drawRect(
+                                        color = colUniform,
+                                        size = androidx.compose.ui.geometry.Size(14f, 22f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth + 38f, bodyY + 4f + rtArmSwingY)
+                                    )
+                                    // Right Hand/Glove
+                                    drawRect(
+                                        color = rightHandColor,
+                                        size = androidx.compose.ui.geometry.Size(14f, 14f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth + 38f, bodyY + 26f + rtArmSwingY)
+                                    )
+
+                                    // 5. BELT (Equipped belt rank) with rank bar stripes
+                                    drawRect(
+                                        color = colBelt,
+                                        size = androidx.compose.ui.geometry.Size(84f, 10f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 42f, bodyY + 32f)
+                                    )
+                                    // The black sleeve tag on the belt
+                                    drawRect(
+                                        color = Color.Black,
+                                        size = androidx.compose.ui.geometry.Size(22f, 10f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth + 10f, bodyY + 32f)
+                                    )
+                                    // White tips/degrees on the sleeve
+                                    drawRect(
+                                        color = Color.White,
+                                        size = androidx.compose.ui.geometry.Size(4f, 10f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth + 14f, bodyY + 32f)
+                                    )
+
+                                    // 6. LEGS & FEET
+                                    val leftLegOffset = if (currentAnimationState == "WALK" || currentAnimationState == "RUN") walkFrame * 12f else 0f
+                                    val rightLegOffset = if (currentAnimationState == "WALK" || currentAnimationState == "RUN") -walkFrame * 12f else 0f
+
+                                    // Pants color matching the uniform style
+                                    drawRect(
+                                        color = colCinzaGrafite,
+                                        size = androidx.compose.ui.geometry.Size(25f, 20f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 30f + leftLegOffset, bodyY + 40f)
+                                    )
+                                    drawRect(
+                                        color = colCinzaGrafite,
+                                        size = androidx.compose.ui.geometry.Size(25f, 20f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth + 5f + rightLegOffset, bodyY + 40f)
+                                    )
+                                    // Bare feet skin matches skin tone selection perfectly
+                                    drawRect(
+                                        color = colSkin,
+                                        size = androidx.compose.ui.geometry.Size(14f, 10f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 25f + leftLegOffset, bodyY + 58f)
+                                    )
+                                    drawRect(
+                                        color = colSkin,
+                                        size = androidx.compose.ui.geometry.Size(14f, 10f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth + 11f + rightLegOffset, bodyY + 58f)
+                                    )
+                                }
+                                "COSTAS" -> {
+                                    val headY = centerHeight - 35f + bounceY
+                                    val headX = centerWidth - bodyLeanX
+
+                                    // 1. HEAD BACK (Full hair or bare skin if bald)
+                                    drawRoundRect(
+                                        color = if (activeHair.id == "h2") colSkin else colHair,
+                                        size = androidx.compose.ui.geometry.Size(62f, 62f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(headX - 31f, headY - 31f),
+                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f, 16f)
+                                    )
+
+                                    if (activeHair.id != "h2") {
+                                        // Back headband or shadow detail
+                                        drawRect(
+                                            color = colCinzaGrafite.copy(alpha = 0.4f),
+                                            size = androidx.compose.ui.geometry.Size(40f, 6f),
+                                            topLeft = androidx.compose.ui.geometry.Offset(headX - 20f, headY - 26f)
+                                        )
+
+                                        // Special Coque Samurai Dojo "h3"
+                                        if (activeHair.id == "h3") {
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(20f, 20f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX - 10f, headY - 48f)
+                                            )
+                                        }
+
+                                        // Special Super Saiyajin "h4" spikes
+                                        if (activeHair.id == "h4") {
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(14f, 22f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX - 20f, headY - 46f)
+                                            )
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(14f, 28f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX - 7f, headY - 52f)
+                                            )
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(14f, 22f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX + 6f, headY - 46f)
+                                            )
+                                        }
+                                    }
+
+                                    // 2. BACK UNIFORM (White/selected with full Red/Black JiuVerse logo print)
+                                    val bodyY = centerHeight + 25f + (bounceY * 0.4f)
+                                    
+                                    drawRect(
+                                        color = colUniform,
+                                        size = androidx.compose.ui.geometry.Size(80f, 40f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 40f, bodyY)
+                                    )
+                                    // Giant Elite Back Mark logo (Red/Black)
+                                    // Dynamic Back Arms with Training Gloves
+                                    val leftArmSwingY = if (currentAnimationState == "WALK" || currentAnimationState == "RUN") walkFrame * 8f else 0f
+                                    val rtArmSwingY = if (currentAnimationState == "WALK" || currentAnimationState == "RUN") -walkFrame * 8f else 0f
+                                    val hasGloves = activeAccessory.id == "a4"
+                                    val leftHandColor = if (hasGloves) activeAccessory.hexValue else if (activeAccessory.id == "a1") Color.White else colSkin
+                                    val rightHandColor = if (hasGloves) activeAccessory.hexValue else if (activeAccessory.id == "a1") Color.White else colSkin
+
+                                    // Left Arm / Sleeve (Back)
+                                    drawRect(
+                                        color = colUniform,
+                                        size = androidx.compose.ui.geometry.Size(14f, 22f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 52f, bodyY + 4f + leftArmSwingY)
+                                    )
+                                    drawRect(
+                                        color = leftHandColor,
+                                        size = androidx.compose.ui.geometry.Size(14f, 14f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 52f, bodyY + 26f + leftArmSwingY)
+                                    )
+
+                                    // Right Arm / Sleeve (Back)
+                                    drawRect(
+                                        color = colUniform,
+                                        size = androidx.compose.ui.geometry.Size(14f, 22f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth + 38f, bodyY + 4f + rtArmSwingY)
+                                    )
+                                    drawRect(
+                                        color = rightHandColor,
+                                        size = androidx.compose.ui.geometry.Size(14f, 14f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth + 38f, bodyY + 26f + rtArmSwingY)
+                                    )
+                                    drawRect(
+                                        color = colVermelho,
+                                        size = androidx.compose.ui.geometry.Size(44f, 24f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 22f, bodyY + 6f)
+                                    )
+                                    drawRect(
+                                        color = colPreto,
+                                        size = androidx.compose.ui.geometry.Size(30f, 14f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 15f, bodyY + 11f)
+                                    )
+
+                                    // 3. BELT BACK (With back side knot)
+                                    drawRect(
+                                        color = colBelt,
+                                        size = androidx.compose.ui.geometry.Size(84f, 10f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 42f, bodyY + 32f)
+                                    )
+                                    // Knot tails hanging down in matching belt rank color
+                                    drawRect(
+                                        color = colBelt,
+                                        size = androidx.compose.ui.geometry.Size(8f, 24f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 8f, bodyY + 32f)
+                                    )
+                                    drawRect(
+                                        color = colBelt,
+                                        size = androidx.compose.ui.geometry.Size(8f, 18f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth + 2f, bodyY + 32f)
+                                    )
+
+                                    // 4. LEGS (Costas view)
+                                    val leftLegOffset = if (currentAnimationState == "WALK" || currentAnimationState == "RUN") walkFrame * 12f else 0f
+                                    val rightLegOffset = if (currentAnimationState == "WALK" || currentAnimationState == "RUN") -walkFrame * 12f else 0f
+
+                                    drawRect(
+                                        color = colCinzaGrafite,
+                                        size = androidx.compose.ui.geometry.Size(25f, 20f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 30f + leftLegOffset, bodyY + 40f)
+                                    )
+                                    drawRect(
+                                        color = colCinzaGrafite,
+                                        size = androidx.compose.ui.geometry.Size(25f, 20f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth + 5f + rightLegOffset, bodyY + 40f)
+                                    )
+
+                                    drawRect(
+                                        color = colSkin,
+                                        size = androidx.compose.ui.geometry.Size(14f, 10f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 25f + leftLegOffset, bodyY + 58f)
+                                    )
+                                    drawRect(
+                                        color = colSkin,
+                                        size = androidx.compose.ui.geometry.Size(14f, 10f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth + 11f + rightLegOffset, bodyY + 58f)
+                                    )
+                                }
+                                "ESQUERDA" -> {
+                                    val headY = centerHeight - 35f + bounceY
+                                    val headX = centerWidth - bodyLeanX
+
+                                    // 1. HEAD PROFILE (Facing left)
+                                    drawRoundRect(
+                                        color = colSkin,
+                                        size = androidx.compose.ui.geometry.Size(54f, 62f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(headX - 27f, headY - 31f),
+                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f, 16f)
+                                    )
+                                    // Hair left side profile
+                                    if (activeHair.id != "h2") {
+                                        drawRect(
+                                            color = colHair,
+                                            size = androidx.compose.ui.geometry.Size(36f, 62f),
+                                            topLeft = androidx.compose.ui.geometry.Offset(headX - 27f, headY - 32f)
+                                        )
+                                        drawRect(
+                                            color = colHair,
+                                            size = androidx.compose.ui.geometry.Size(56f, 20f),
+                                            topLeft = androidx.compose.ui.geometry.Offset(headX - 28f, headY - 32f)
+                                        )
+
+                                        // Special Coque Samurai Dojo "h3"
+                                        if (activeHair.id == "h3") {
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(20f, 20f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX - 18f, headY - 48f)
+                                            )
+                                        }
+
+                                        // Special Super Saiyajin "h4" spikes
+                                        if (activeHair.id == "h4") {
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(12f, 24f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX - 15f, headY - 48f)
+                                            )
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(12f, 28f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX - 3f, headY - 52f)
+                                            )
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(12f, 20f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX + 9f, headY - 44f)
+                                            )
+                                        }
+                                    }
+
+                                    // Left Eye profile
+                                    drawRect(
+                                        color = Color.White,
+                                        size = androidx.compose.ui.geometry.Size(10f, 12f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(headX + 10f, headY - 2f)
+                                    )
+                                    drawRect(
+                                        color = Color.Black,
+                                        size = androidx.compose.ui.geometry.Size(5f, 12f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(headX + 10f, headY - 2f)
+                                    )
+
+                                    // Profile mouth
+                                    drawRect(
+                                        color = Color(0xFFE11D48),
+                                        size = androidx.compose.ui.geometry.Size(5f, 3f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(headX + 15f, headY + 16f)
+                                    )
+
+                                    // Beard profile if equipped
+                                    if (activeBeard.id != "b0") {
+                                        drawRect(
+                                            color = colBeard,
+                                            size = androidx.compose.ui.geometry.Size(16f, 14f),
+                                            topLeft = androidx.compose.ui.geometry.Offset(headX + 11f, headY + 17f)
+                                        )
+                                        drawRect(
+                                            color = colBeard,
+                                            size = androidx.compose.ui.geometry.Size(12f, 6f),
+                                            topLeft = androidx.compose.ui.geometry.Offset(headX + 15f, headY + 11f)
+                                        )
+                                    }
+
+                                    // 2. SHIRT SLEEVE PROFILE (With red badge bar)
+                                    val bodyY = centerHeight + 25f + (bounceY * 0.4f)
+                                    
+                                    // Dynamic Left Profile Arm with Training Gloves
+                                    val leftArmSwingXS = if (currentAnimationState == "WALK" || currentAnimationState == "RUN") walkFrame * 10f else 0f
+                                    val leftArmSwingYS = if (currentAnimationState == "WALK" || currentAnimationState == "RUN") kotlin.math.abs(walkFrame) * 4f else 0f
+                                    val hasGloves = activeAccessory.id == "a4"
+                                    val leftHandColor = if (hasGloves) activeAccessory.hexValue else if (activeAccessory.id == "a1") Color.White else colSkin
+
+                                    drawRect(
+                                        color = colUniform,
+                                        size = androidx.compose.ui.geometry.Size(50f, 40f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 25f, bodyY)
+                                    )
+
+                                    // Draw Arm on profile body
+                                    drawRect(
+                                        color = colUniform,
+                                        size = androidx.compose.ui.geometry.Size(16f, 24f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 8f + leftArmSwingXS, bodyY + 12f + leftArmSwingYS)
+                                    )
+                                    // Draw Hand/Glove on profile body
+                                    drawRect(
+                                        color = leftHandColor,
+                                        size = androidx.compose.ui.geometry.Size(16f, 12f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 8f + leftArmSwingXS, bodyY + 36f + leftArmSwingYS)
+                                    )
+                                    drawRect(
+                                        color = colVermelho,
+                                        size = androidx.compose.ui.geometry.Size(10f, 30f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 8f, bodyY + 4f)
+                                    )
+                                    drawRect(
+                                        color = colPreto,
+                                        size = androidx.compose.ui.geometry.Size(10f, 40f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 23f, bodyY)
+                                    )
+
+                                    // 3. WHITE BELT (Profile side)
+                                    drawRect(
+                                        color = colBelt,
+                                        size = androidx.compose.ui.geometry.Size(54f, 10f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 27f, bodyY + 32f)
+                                    )
+
+                                    // 4. LEGS (Profile movement swinging)
+                                    val legSwing = if (currentAnimationState == "WALK" || currentAnimationState == "RUN") walkFrame * 14f else 0f
+                                    
+                                    drawRect(
+                                        color = colCinzaGrafite,
+                                        size = androidx.compose.ui.geometry.Size(26f, 20f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 13f + legSwing, bodyY + 40f)
+                                    )
+                                    drawRect(
+                                        color = colSkin,
+                                        size = androidx.compose.ui.geometry.Size(16f, 10f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 8f + legSwing, bodyY + 58f)
+                                    )
+                                }
+                                "DIREITA" -> {
+                                    val headY = centerHeight - 35f + bounceY
+                                    val headX = centerWidth + bodyLeanX
+
+                                    // 1. HEAD PROFILE (Facing right)
+                                    drawRoundRect(
+                                        color = colSkin,
+                                        size = androidx.compose.ui.geometry.Size(54f, 62f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(headX - 27f, headY - 31f),
+                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f, 16f)
+                                    )
+                                    // Hair right side profile
+                                    if (activeHair.id != "h2") {
+                                        drawRect(
+                                            color = colHair,
+                                            size = androidx.compose.ui.geometry.Size(36f, 62f),
+                                            topLeft = androidx.compose.ui.geometry.Offset(headX - 9f, headY - 32f)
+                                        )
+                                        drawRect(
+                                            color = colHair,
+                                            size = androidx.compose.ui.geometry.Size(56f, 20f),
+                                            topLeft = androidx.compose.ui.geometry.Offset(headX - 28f, headY - 32f)
+                                        )
+
+                                        // Special Coque Samurai Dojo "h3"
+                                        if (activeHair.id == "h3") {
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(20f, 20f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX - 2f, headY - 48f)
+                                            )
+                                        }
+
+                                        // Special Super Saiyajin "h4" spikes
+                                        if (activeHair.id == "h4") {
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(12f, 20f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX - 21f, headY - 44f)
+                                            )
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(12f, 28f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX - 9f, headY - 52f)
+                                            )
+                                            drawRect(
+                                                color = colHair,
+                                                size = androidx.compose.ui.geometry.Size(12f, 24f),
+                                                topLeft = androidx.compose.ui.geometry.Offset(headX + 3f, headY - 48f)
+                                            )
+                                        }
+                                    }
+
+                                    // Right Eye Profile
+                                    drawRect(
+                                        color = Color.White,
+                                        size = androidx.compose.ui.geometry.Size(10f, 12f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(headX - 20f, headY - 2f)
+                                    )
+                                    drawRect(
+                                        color = Color.Black,
+                                        size = androidx.compose.ui.geometry.Size(5f, 12f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(headX - 15f, headY - 2f)
+                                    )
+
+                                    // Profile mouth
+                                    drawRect(
+                                        color = Color(0xFFE11D48),
+                                        size = androidx.compose.ui.geometry.Size(5f, 3f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(headX - 20f, headY + 16f)
+                                    )
+
+                                    // Beard profile if equipped
+                                    if (activeBeard.id != "b0") {
+                                        drawRect(
+                                            color = colBeard,
+                                            size = androidx.compose.ui.geometry.Size(16f, 14f),
+                                            topLeft = androidx.compose.ui.geometry.Offset(headX - 27f, headY + 17f)
+                                        )
+                                        drawRect(
+                                            color = colBeard,
+                                            size = androidx.compose.ui.geometry.Size(12f, 6f),
+                                            topLeft = androidx.compose.ui.geometry.Offset(headX - 27f, headY + 11f)
+                                        )
+                                    }
+
+                                    // 2. SHIRT SLEEVE PROFILE RIGHT
+                                    val bodyY = centerHeight + 25f + (bounceY * 0.4f)
+                                    
+                                    // Dynamic Right Profile Arm with Training Gloves
+                                    val rightArmSwingXS = if (currentAnimationState == "WALK" || currentAnimationState == "RUN") -walkFrame * 10f else 0f
+                                    val rightArmSwingYS = if (currentAnimationState == "WALK" || currentAnimationState == "RUN") kotlin.math.abs(walkFrame) * 4f else 0f
+                                    val hasGloves = activeAccessory.id == "a4"
+                                    val rightHandColor = if (hasGloves) activeAccessory.hexValue else if (activeAccessory.id == "a1") Color.White else colSkin
+
+                                    drawRect(
+                                        color = colUniform,
+                                        size = androidx.compose.ui.geometry.Size(50f, 40f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 25f, bodyY)
+                                    )
+
+                                    // Draw Arm on profile body (Right)
+                                    drawRect(
+                                        color = colUniform,
+                                        size = androidx.compose.ui.geometry.Size(16f, 24f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 8f + rightArmSwingXS, bodyY + 12f + rightArmSwingYS)
+                                    )
+                                    // Draw Hand/Glove on profile body (Right)
+                                    drawRect(
+                                        color = rightHandColor,
+                                        size = androidx.compose.ui.geometry.Size(16f, 12f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 8f + rightArmSwingXS, bodyY + 36f + rightArmSwingYS)
+                                    )
+                                    drawRect(
+                                        color = colVermelho,
+                                        size = androidx.compose.ui.geometry.Size(10f, 30f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 2f, bodyY + 4f)
+                                    )
+                                    drawRect(
+                                        color = colPreto,
+                                        size = androidx.compose.ui.geometry.Size(10f, 40f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth + 13f, bodyY)
+                                    )
+
+                                    // 3. BELT PROFILE SIDE RIGHT
+                                    drawRect(
+                                        color = colBelt,
+                                        size = androidx.compose.ui.geometry.Size(54f, 10f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 27f, bodyY + 32f)
+                                    )
+
+                                    // 4. LEGS RIGHT SWING
+                                    val legSwing = if (currentAnimationState == "WALK" || currentAnimationState == "RUN") -walkFrame * 14f else 0f
+                                    
+                                    drawRect(
+                                        color = colCinzaGrafite,
+                                        size = androidx.compose.ui.geometry.Size(26f, 20f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 13f + legSwing, bodyY + 40f)
+                                    )
+                                    drawRect(
+                                        color = colSkin,
+                                        size = androidx.compose.ui.geometry.Size(16f, 10f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(centerWidth - 8f + legSwing, bodyY + 58f)
+                                    )
+                                }
+                            }
+
+                            // Outline border ring mapping
                             drawCircle(
-                                color = BlueprintCyan.copy(alpha = 0.3f),
-                                radius = 100f + (breathOffset * 0.5f),
+                                color = BlueprintCyan.copy(alpha = 0.25f),
+                                radius = 95f + (bounceY * 0.2f),
                                 style = Stroke(width = 1f),
-                                center = androidx.compose.ui.geometry.Offset(centerWidth, size.height / 2 - 10f)
+                                center = androidx.compose.ui.geometry.Offset(centerWidth, centerHeight + 10f)
                             )
                         }
 
@@ -339,12 +995,12 @@ fun AvatarTab(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
                                 .padding(6.dp)
-                                .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+                                .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(4.dp))
                                 .border(0.5.dp, BlueprintCyan, RoundedCornerShape(4.dp))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = "ANIMAÇÃO: ${currentAnimationState}",
+                                text = "MODO: ${currentAnimationState} | DST: ${activeDirection}",
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = BlueprintCyan,
@@ -356,50 +1012,45 @@ fun AvatarTab(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     // Play animation testing row
-                    Text("Testar Gestos e Atitude de Entrada:", fontSize = 9.sp, color = BlueprintTextSecondary)
+                    Text("CONTROLADOR DE MOVIMENTOS (ANIMAÇÕES):", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = BlueprintTextSecondary)
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         listOf(
-                            "IDLE" to "IDLE RESPIRO",
-                            "OSS_BOW" to "OSS!",
-                            "SPARRING" to "LUCIANDO"
+                            "IDLE" to "IDLE (RESPIRA)",
+                            "WALK" to "WALK (15 FPS)",
+                            "RUN" to "RUN (SQUARE)"
                         ).forEach { (anim, label) ->
+                            val isSelected = currentAnimationState == anim
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .background(if (currentAnimationState == anim) BlueprintTeal.copy(alpha = 0.2f) else Color(0xFF1E293B), RoundedCornerShape(4.dp))
-                                    .border(0.5.dp, if (currentAnimationState == anim) BlueprintTeal else BlueprintGridLine, RoundedCornerShape(4.dp))
+                                    .background(if (isSelected) BlueprintTeal.copy(alpha = 0.25f) else Color(0xFF1E293B), RoundedCornerShape(4.dp))
+                                    .border(0.5.dp, if (isSelected) BlueprintTeal else BlueprintGridLine, RoundedCornerShape(4.dp))
                                     .clickable { currentAnimationState = anim }
                                     .padding(vertical = 4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(label, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = if (currentAnimationState == anim) BlueprintTeal else BlueprintTextSecondary)
+                                Text(label, fontSize = 8.sp, fontWeight = FontWeight.Black, color = if (isSelected) BlueprintTeal else BlueprintTextSecondary)
                             }
                         }
                     }
 
                     // Equiped HUD cards
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.4f)),
                         border = BorderStroke_workaround(BlueprintGridLine)
                     ) {
                         Column(modifier = Modifier.padding(8.dp)) {
-                            Text("EQUIPAMENTO CORRENTE:", fontSize = 8.sp, color = BlueprintTextSecondary, fontWeight = FontWeight.Bold)
-                            
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                                Text("🥋 ${activeUniform.name}", fontSize = 8.sp, color = BlueprintTextPrimary)
-                                Text("🎗️ ${activeBelt.name}", fontSize = 8.sp, color = BlueprintTextPrimary)
-                            }
-
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 2.dp)) {
-                                Text("🕶️ ${activeAccessory.name}", fontSize = 8.sp, color = BlueprintTextPrimary)
-                                Text("🐾 ${activePet.name}", fontSize = 8.sp, color = BlueprintOrange, fontWeight = FontWeight.Bold)
-                            }
+                            Text("ESPECIFICAÇÕES DO AVATAR ORIGINAL:", fontSize = 8.sp, color = BlueprintCyan, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text("• Uniforme: White Body Rashguard, Black Compression, Red Badge", fontSize = 7.5.sp, color = BlueprintTextPrimary)
+                            Text("• Orientação: Isometric 4-Way Seamless 2.5D Social Virtual Base", fontSize = 7.5.sp, color = BlueprintTextPrimary)
+                            Text("• Palette Hex: Black (#0C0A09), White (#F8FAFC), Red (#EF4444), Graphite (#475569)", fontSize = 7.5.sp, color = BlueprintTextSecondary)
                         }
                     }
                 }

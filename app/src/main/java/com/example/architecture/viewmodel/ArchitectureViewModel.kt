@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit
 class ArchitectureViewModel : ViewModel() {
 
     // --- Tab Navigation State ---
-    private val _selectedTab = MutableStateFlow(1)
+    private val _selectedTab = MutableStateFlow(0)
     val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()
 
     fun selectTab(index: Int) {
@@ -290,6 +290,9 @@ class ArchitectureViewModel : ViewModel() {
     private val _selectedAcademyStudents = MutableStateFlow<List<com.example.architecture.database.GymStudentEntity>>(emptyList())
     val selectedAcademyStudents: StateFlow<List<com.example.architecture.database.GymStudentEntity>> = _selectedAcademyStudents.asStateFlow()
 
+    private val _allStudentsState = MutableStateFlow<List<com.example.architecture.database.GymStudentEntity>>(emptyList())
+    val allStudentsState: StateFlow<List<com.example.architecture.database.GymStudentEntity>> = _allStudentsState.asStateFlow()
+
     fun initializeSensei(context: android.content.Context) {
         if (senseiRepository != null) return
         val db = com.example.architecture.database.SenseiRoomDatabase.getDatabase(context)
@@ -317,6 +320,12 @@ class ArchitectureViewModel : ViewModel() {
         viewModelScope.launch {
             repo.allTournaments.collect { tournaments ->
                 _realTournaments.value = tournaments
+            }
+        }
+
+        viewModelScope.launch {
+            repo.allStudents.collect { students ->
+                _allStudentsState.value = students
             }
         }
         
