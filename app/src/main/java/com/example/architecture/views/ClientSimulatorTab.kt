@@ -48,6 +48,10 @@ import com.example.architecture.viewmodel.ArchitectureViewModel
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebChromeClient
+import android.webkit.ConsoleMessage
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceError
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.ui.theme.*
 
@@ -95,6 +99,12 @@ fun ClientSimulatorTab(
     var selectedEnvironment by remember { mutableStateOf("Academia Carlson Gracie") }
     var useWebPhaser by remember { mutableStateOf(true) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    
+    // Webview diagnostic states for loading screens and error fallbacks
+    var webViewLoadingState by remember { mutableStateOf(true) }
+    var webViewErrorState by remember { mutableStateOf<String?>(null) }
+    val jsLogs = remember { mutableStateListOf<String>() }
+    var showConsoleLogs by remember { mutableStateOf(false) }
     
     // Bottom navigation panel active tab descriptor: "INV", "SHOP", "QUESTS", "ACADEMY"
     var activeBottomTab by remember { mutableStateOf("INV") }
@@ -589,46 +599,82 @@ fun ClientSimulatorTab(
                     contentAlignment = Alignment.Center
                 ) {
                     if (useWebPhaser) {
-                        // Core Interactive Phaser 3 HTML5 Game Engine Simulator Webview!
-                        AndroidView(
-                            factory = { context ->
-                                WebView(context).apply {
-                                    webViewClient = WebViewClient()
-                                    settings.javaScriptEnabled = true
-                                    settings.domStorageEnabled = true
-                                    settings.useWideViewPort = true
-                                    settings.loadWithOverviewMode = true
-                                    settings.mixedContentMode = 0 // MIXED_CONTENT_ALWAYS_ALLOW
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            // Core Interactive Phaser 3 HTML5 Game Engine Simulator Webview!
+                            AndroidView(
+                                factory = { context ->
+                                    WebView(context).apply {
+                                        webViewClient = object : WebViewClient() {
+                                            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                                                super.onPageStarted(view, url, favicon)
+                                                webViewLoadingState = true
+                                                webViewErrorState = null
+                                            }
 
-                                    addJavascriptInterface(object : Any() {
-                                        @JavascriptInterface
-                                        fun postMessage(message: String) {
-                                            try {
-                                                val json = org.json.JSONObject(message)
-                                                val type = json.optString("type")
-                                                if (type == "PLAYER_MOVE") {
-                                                    playerX = json.optInt("x")
-                                                    playerY = json.optInt("y")
+                                            override fun onPageFinished(view: WebView?, url: String?) {
+                                                super.onPageFinished(view, url)
+                                                webViewLoadingState = false
+                                            }
+
+                                            override fun onReceivedError(
+                                                view: WebView?,
+                                                request: WebResourceRequest?,
+                                                error: WebResourceError?
+                                            ) {
+                                                super.onReceivedError(view, request, error)
+                                                if (request?.isForMainFrame == true) {
+                                                    webViewErrorState = error?.description?.toString() ?: "Erro ao carregar o simulador"
+                                                    webViewLoadingState = false
                                                 }
-                                                if (type == "ENV_CHANGE") {
-                                                    selectedEnvironment = json.optString("env")
-                                                    playerX = json.optInt("x")
-                                                    playerY = json.optInt("y")
-                                                }
-                                                if (type == "CHAT_MESSAGE") {
-                                                    val sender = json.optString("sender")
-                                                    val content = json.optString("content")
-                                                    simMessages.add(
-                                                        SimMsg(sender, content, "22:45", false, "LOCAL")
-                                                    )
-                                                }
-                                            } catch (e: Exception) {
-                                                e.printStackTrace()
                                             }
                                         }
-                                    }, "AndroidWebView")
 
-                                    // EMBEDDED PHASER 3 ISO ENGINE (SELF-CONTAINED VEKTOR TILESETS AND COLLISION)
+                                        webChromeClient = object : WebChromeClient() {
+                                            override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                                                consoleMessage?.let {
+                                                    val logMsg = "[${it.messageLevel()}] ${it.message()} (L${it.lineNumber()})"
+                                                    jsLogs.add(logMsg)
+                                                    android.util.Log.d("JiuVersePhaserConsole", logMsg)
+                                                }
+                                                return true
+                                            }
+                                        }
+
+                                        settings.javaScriptEnabled = true
+                                        settings.domStorageEnabled = true
+                                        settings.useWideViewPort = true
+                                        settings.loadWithOverviewMode = true
+                                        settings.mixedContentMode = 0 // MIXED_CONTENT_ALWAYS_ALLOW
+
+                                        addJavascriptInterface(object : Any() {
+                                            @JavascriptInterface
+                                            fun postMessage(message: String) {
+                                                try {
+                                                    val json = org.json.JSONObject(message)
+                                                    val type = json.optString("type")
+                                                    if (type == "PLAYER_MOVE") {
+                                                        playerX = json.optInt("x")
+                                                        playerY = json.optInt("y")
+                                                    }
+                                                    if (type == "ENV_CHANGE") {
+                                                        selectedEnvironment = json.optString("env")
+                                                        playerX = json.optInt("x")
+                                                        playerY = json.optInt("y")
+                                                    }
+                                                    if (type == "CHAT_MESSAGE") {
+                                                        val sender = json.optString("sender")
+                                                        val content = json.optString("content")
+                                                        simMessages.add(
+                                                            SimMsg(sender, content, "22:45", false, "LOCAL")
+                                                        )
+                                                    }
+                                                } catch (e: Exception) {
+                                                    e.printStackTrace()
+                                                }
+                                            }
+                                        }, "AndroidWebView")
+
+                                        // EMBEDDED PHASER 3 ISO ENGINE (SELF-CONTAINED VEKTOR TILESETS AND COLLISION)
                                     val phaserHtml = """
                                         <!DOCTYPE html>
                                         <html>
@@ -1352,75 +1398,7 @@ fun ClientSimulatorTab(
                                                          });
                                                      }
 
-                                                     originalMovePlayerTo(targetX, targetY) {
-                                                        // Collision limits boundaries checking
-                                                        if (targetX < 0 || targetX >= GRID_SIZE || targetY < 0 || targetY >= GRID_SIZE) {
-                                                            this.cameras.main.shake(80, 0.003);
-                                                            return;
-                                                        }
 
-                                                        // Solid elements blocks collision
-                                                        if (targetX === 2 && targetY === 2 && currentEnv === 'Academia Carlson Gracie') {
-                                                            this.cameras.main.shake(80, 0.003);
-                                                            return; // Locked obstacle
-                                                        }
-
-                                                        this.isMoving = true;
-                                                        playerX = targetX;
-                                                        playerY = targetY;
-
-                                                        const pxX = (playerX - playerY) * this.wHalf + this.originX;
-                                                        const pxY = (playerX + playerY) * this.hHalf + this.originY;
-
-                                                        this.tweens.add({
-                                                            targets: this.playerVisual,
-                                                            x: pxX,
-                                                            y: pxY,
-                                                            duration: 200,
-                                                            onComplete: () => {
-                                                                this.isMoving = false;
-                                                                this.playerVisual.depth = (playerX + playerY) * 2 + 3;
-
-                                                                // Notify Android layer
-                                                                if(window.AndroidWebView) {
-                                                                    window.AndroidWebView.postMessage(JSON.stringify({
-                                                                        type: 'PLAYER_MOVE',
-                                                                        x: playerX,
-                                                                        y: playerY
-                                                                    }));
-                                                                }
-
-                                                                // Trigger portal teletransports triggers!
-                                                                if (playerX === 0 && playerY === 5) {
-                                                                    this.triggerTeleportPortal();
-                                                                }
-                                                            }
-                                                        });
-                                                    }
-
-                                                    triggerTeleportPortal() {
-                                                        this.cameras.main.fadeOut(300, 0, 0, 0);
-                                                        this.cameras.main.once('camerafadeoutcomplete', () => {
-                                                            // Transport to Arena PvP if inside dojo, or back to plaza/etc.
-                                                            const nextRoom = (currentEnv === 'Academia Carlson Gracie') ? 'Arena PvP' : 'Academia Carlson Gracie';
-                                                            currentEnv = nextRoom;
-                                                            playerX = 7;
-                                                            playerY = 7;
-
-                                                            this.renderIsometricMap();
-                                                            this.renderPlayerAvatar();
-                                                            this.cameras.main.fadeIn(300);
-
-                                                            if (window.AndroidWebView) {
-                                                                window.AndroidWebView.postMessage(JSON.stringify({
-                                                                    type: 'ENV_CHANGE',
-                                                                    env: nextRoom,
-                                                                    x: 7,
-                                                                    y: 7
-                                                                }));
-                                                            }
-                                                        });
-                                                    }
 
                                                     forceEnvironmentChange(env) {
                                                         currentEnv = env;
@@ -1762,6 +1740,104 @@ fun ClientSimulatorTab(
                             },
                             modifier = Modifier.fillMaxSize()
                         )
+
+                        // 1. Loading Screen (Tela de carregamento)
+                        if (webViewLoadingState) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color(0xFF020617))
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    color = BlueprintCyan,
+                                    modifier = Modifier.size(32.dp),
+                                    strokeWidth = 3.dp
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "CARREGANDO DOJO ISOMÉTRICO (PHASER 3)...",
+                                    color = BlueprintCyan,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Iniciando mapeamento de colisões, texturas Kenney Retro e materiais Phaser...",
+                                    color = BlueprintTextSecondary,
+                                    fontSize = 7.5.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+
+                        // 2. Global Fallback Screen for WebView rendering/connection errors
+                        webViewErrorState?.let { errMsg ->
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color(0xFF090D16))
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = "Erro de inicialização",
+                                    tint = Color(0xFFEF4444),
+                                    modifier = Modifier.size(32.dp)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "FALHA NA RENDERIZAÇÃO DO CLIENTE",
+                                    color = Color(0xFFEF4444),
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = errMsg,
+                                    color = BlueprintTextSecondary,
+                                    fontSize = 8.5.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 12.dp)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            useWebPhaser = false
+                                            webViewLoadingState = true
+                                            webViewErrorState = null
+                                            jsLogs.clear()
+                                            useWebPhaser = true
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                                        shape = RoundedCornerShape(4.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Text("Recarregar", fontSize = 9.sp, color = Color.White)
+                                    }
+                                    Button(
+                                        onClick = {
+                                            useWebPhaser = false
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = BlueprintCyan),
+                                        shape = RoundedCornerShape(4.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Text("Fallback Canvas", fontSize = 9.sp, color = Color.Black)
+                                    }
+                                }
+                            }
+                        }
+                    } // Ends the Box containing WebView + overlays
                     } else {
                         // Native Compose 60FPS Simulated Isometric view fallback
                         Box(modifier = Modifier.fillMaxSize()) {
@@ -1888,6 +1964,86 @@ fun ClientSimulatorTab(
                                 .size(16.dp)
                                 .background(BlueprintOrange, CircleShape)
                         )
+                    }
+                }
+
+                // Collapsible JS Console Log Viewer (Developer / Director Auditing tool)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showConsoleLogs = !showConsoleLogs }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (showConsoleLogs) "▼" else "▲",
+                                color = BlueprintCyan,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.width(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "CONSOLE LOG JS INTERNO DO DOJO (${jsLogs.size} LOGS)",
+                                color = BlueprintCyan,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        if (jsLogs.isNotEmpty()) {
+                            Text(
+                                text = "LIMPAR",
+                                color = Color(0xFFEF4444),
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clickable { jsLogs.clear() }
+                            )
+                        }
+                    }
+                    
+                    if (showConsoleLogs) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(100.dp)
+                                .background(Color(0xFF020617))
+                                .border(1.dp, BlueprintCyan.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                                .padding(4.dp)
+                        ) {
+                            if (jsLogs.isEmpty()) {
+                                Text(
+                                    text = "Nenhum log no console. WebView inicializado limpo.",
+                                    color = BlueprintTextSecondary,
+                                    fontSize = 8.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    items(jsLogs) { log ->
+                                        Text(
+                                            text = log,
+                                            color = if (log.contains("ERROR")) Color(0xFFEF4444) else if (log.contains("WARN")) Color(0xFFFBBF24) else Color(0xFFCBD5E1),
+                                            fontSize = 8.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            lineHeight = 10.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
