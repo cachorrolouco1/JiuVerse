@@ -477,6 +477,191 @@ server {
 }"""),
                     FolderItem("coturn.conf", "Configurações de rede, portas udp/tcp e segredos para o Coturn TURN Server em produção.", isFile = true)
                 )
+            ),
+            FolderItem(
+                name = "phaser3-engine",
+                description = "Motor Phaser 3 e especificações de exportação isométrica 2D da biblioteca do JiuVerse.",
+                isFile = false,
+                children = listOf(
+                    FolderItem(
+                        name = "JiuVerseMapSchema.json",
+                        description = "Gabarito de dados de exportação de mapas isométricos do JiuVerse compatível com Web-loaders.",
+                        isFile = true,
+                        sampleCode = """{
+  "mapName": "Dojo_Presidente_Carlson_Gracie",
+  "tileWidth": 64,
+  "tileHeight": 32,
+  "gridSize": { "x": 16, "y": 16 },
+  "tilesets": [
+    {
+      "name": "jiuverse_floors_and_tatames",
+      "image": "assets/tilesets/floors_neon_and_wood.png",
+      "tilewidth": 64,
+      "tileheight": 64,
+      "margin": 0,
+      "spacing": 0,
+      "properties": {
+        "tatame_carlson_01": { "walkable": true, "height": 0.0, "slip_factor": 1.0 },
+        "esteira_tatame_zen": { "walkable": true, "height": 0.0, "slip_factor": 0.9 },
+        "tatame_sintetico_pvp": { "walkable": true, "height": 0.0, "slip_factor": 1.2 }
+      }
+    },
+    {
+      "name": "jiuverse_solid_decorations",
+      "image": "assets/tilesets/decorations_heavy_props.png",
+      "tilewidth": 128,
+      "tileheight": 192,
+      "margin": 0,
+      "spacing": 0,
+      "properties": {
+        "estatua_fundador": { "walkable": false, "originX": 0.5, "originY": 0.82, "width_cells": 2, "height_cells": 2 },
+        "gongo_laton_01": { "walkable": false, "originX": 0.5, "originY": 0.78, "width_cells": 1, "height_cells": 1 },
+        "rack_kimonos": { "walkable": false, "originX": 0.5, "originY": 0.8, "width_cells": 2, "height_cells": 1 }
+      }
+    }
+  ],
+  "layers": {
+    "terrain": [
+      [1, 1, 1, 1, 1, 1, 1, 1],
+      [1, 2, 2, 2, 2, 2, 2, 1],
+      [1, 2, 3, 3, 3, 3, 2, 1],
+      [1, 2, 3, 3, 3, 3, 2, 1],
+      [1, 2, 2, 2, 2, 2, 2, 1],
+      [1, 1, 1, 1, 1, 1, 1, 1]
+    ],
+    "decor_solid": [
+      { "id": "estatua_fundador", "gridX": 4, "gridY": 4, "z": 0.0 },
+      { "id": "gongo_laton_01", "gridX": 1, "gridY": 3, "z": 0.0 }
+    ],
+    "teleporters": [
+      { "tileX": 0, "tileY": 3, "targetRoomId": "praca_social_central", "spawnX": 14, "spawnY": 15 }
+    ]
+  }
+}"""
+                    ),
+                    FolderItem(
+                        name = "JiuVerseIsometricScene.js",
+                        description = "Engine Phaser 3 para renderização em perspectiva isométrica (Z-Sorting dinâmico, colisões e portas).",
+                        isFile = true,
+                        sampleCode = """class JiuVerseIsometricScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'JiuVerseIsometricScene' });
+    }
+
+    preload() {
+        this.load.json('carlson_dojo_map', 'assets/maps/carlson_gracie_dojo.json');
+        this.load.image('floors_tileset', 'assets/tilesets/floors_neon_and_wood.png');
+        this.load.image('props_tileset', 'assets/tilesets/decorations_heavy_props.png');
+        this.load.spritesheet('avatar_combat', 'assets/spritesheets/avatar_vetorial.png', {
+            frameWidth: 64,
+            frameHeight: 96
+        });
+    }
+
+    create() {
+        const mapData = this.cache.json.get('carlson_dojo_map');
+        this.tileWidth = mapData.tileWidth;
+        this.tileHeight = mapData.tileHeight;
+        this.gridSizeX = mapData.gridSize.x;
+        this.gridSizeY = mapData.gridSize.y;
+
+        this.wHalf = this.tileWidth / 2;
+        this.hHalf = this.tileHeight / 2;
+        this.originX = this.cameras.main.width / 2;
+        this.originY = 120;
+        this.isoGroup = this.add.group();
+
+        this.mapMatrix = [];
+        for (let x = 0; x < this.gridSizeX; x++) {
+            this.mapMatrix[x] = [];
+            for (let y = 0; y < this.gridSizeY; y++) {
+                const tileTypeId = mapData.layers.terrain[x][y];
+                const posX = (x - y) * this.wHalf + this.originX;
+                const posY = (x + y) * this.hHalf + this.originY;
+
+                const floorTile = this.add.image(posX, posY, 'floors_tileset', tileTypeId);
+                floorTile.setOrigin(0.5, 0.5);
+                floorTile.setDepth((x + y) * 10 - 5);
+
+                this.mapMatrix[x][y] = {
+                    walkable: tileTypeId !== 1,
+                    teleport: null
+                };
+            }
+        }
+
+        mapData.layers.decor_solid.forEach(prop => {
+            const posX = (prop.gridX - prop.gridY) * this.wHalf + this.originX;
+            const posY = (prop.gridX + prop.gridY) * this.hHalf + this.originY - (prop.z * 16);
+
+            const decorProp = this.add.image(posX, posY, 'props_tileset', prop.id);
+            decorProp.setOrigin(0.5, 0.85);
+            decorProp.setDepth((prop.gridX + prop.gridY) * 10 + 2);
+            this.isoGroup.add(decorProp);
+
+            this.mapMatrix[prop.gridX][prop.gridY].walkable = false;
+        });
+
+        this.cursors = this.input.keyboard.createCursorKeys();
+        this.isMoving = false;
+    }
+}"""
+                    )
+                )
+            ),
+            FolderItem(
+                name = "avatar-sprites-spec",
+                description = "Guia de produção de sprites originais do JiuVerse (Avatar Bases, Kimonos, Faixas, Equipamentos).",
+                isFile = false,
+                children = listOf(
+                    FolderItem(
+                        name = "JiuVerseAvatarConfig.json",
+                        description = "Metadados JSON de configuração de somatotótipos, fps e linhas/estruturas das animações do JiuVerse.",
+                        isFile = true,
+                        sampleCode = """{
+  "avatarCollection": "JiuVerse_S1_2026",
+  "baseProperties": {
+    "cellWidth": 64,
+    "cellHeight": 96,
+    "pixelRatio": "HD_DDP"
+  },
+  "somatotypes": {
+    "male_heavy": {
+      "baseSprite": "assets/sprites/char_base_male_hd.png",
+      "shoulder_offset_px": 3,
+      "head_anchor_y": 76
+    },
+    "female_passer": {
+      "baseSprite": "assets/sprites/char_base_female_hd.png",
+      "shoulder_offset_px": 0,
+      "head_anchor_y": 74
+    }
+  },
+  "states": {
+    "idle": { "rowY": 0, "framesCount": 4, "animationFps": 6 },
+    "walk": { "rowY": 1, "framesCount": 6, "animationFps": 12 },
+    "combat_stance": { "rowY": 2, "framesCount": 1, "animationFps": 0 },
+    "bow_respect": { "rowY": 3, "framesCount": 3, "animationFps": 8 }
+  }
+}"""
+                    ),
+                    FolderItem(
+                        name = "gear_priority_matrix.txt",
+                        description = "Matriz de renderização e prioridades de Z-Ordering de camadas de desenho (sobreposições).",
+                        isFile = true,
+                        sampleCode = """Ordem de sobreposição no canvas para composição dinâmica de avatares:
+
+1. LAYER_0: Sombra no Solo (Elipse preta translúcida, 30% opacidade)
+2. LAYER_1: Base Anatômica (Padrão de Pele Masculino/Feminino)
+3. LAYER_2: Cabelo/Corte (Penteados, coques ou cabelos curtos)
+4. LAYER_3: Calça do Kimono (Envolve quadril e perninhas)
+5. LAYER_4: Jaqueta de Kimono (Vestimenta de ombros e tórax superior)
+6. LAYER_5: Faixa BJJ (Envolve o centro geométrico Y=36px)
+7. LAYER_6: Mochila / Saco Transversal (Equipamento traseiro/costas)
+8. LAYER_7: Boné / Chapéu / Touca (Encaixado acima do cabelo, Y >= 72px)
+9. LAYER_8: Equipamentos de Mão (Relógio, Luvas de sparring)"""
+                    )
+                )
             )
         )
     )
