@@ -96,7 +96,7 @@ fun ClientSimulatorTab(
     // Positions and environments
     var playerX by remember { mutableStateOf(6) }
     var playerY by remember { mutableStateOf(8) }
-    var selectedEnvironment by remember { mutableStateOf("Academia Carlson Gracie") }
+    var selectedEnvironment by remember { mutableStateOf("Oceano Jiu-Jitsu") }
     var useWebPhaser by remember { mutableStateOf(true) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     
@@ -521,7 +521,7 @@ fun ClientSimulatorTab(
                         
                         Spacer(modifier = Modifier.height(4.dp))
 
-                        val topRooms = listOf("Praça Central", "Academia Carlson Gracie", "Arena PvP", "Loja Oficial", "Hall da Fama")
+                        val topRooms = listOf("Praça Central", "Oceano Jiu-Jitsu", "Arena PvP", "Loja Oficial", "Hall da Fama")
                         val bottomRooms = listOf("Vestiários", "Casas", "Apartamentos", "Escritórios", "Salas VIP")
 
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -708,13 +708,13 @@ fun ClientSimulatorTab(
 
                                                 let playerX = 6;
                                                 let playerY = 8;
-                                                let currentEnv = 'Academia Carlson Gracie';
+                                                let currentEnv = 'Oceano Jiu-Jitsu';
                                                 let playerBelt = 'Branca';
                                                 let engineType = 'PHASER'; // 'PHASER' or 'CANVAS'
 
                                                 const environmentsCycle = [
                                                     'Praça Central',
-                                                    'Academia Carlson Gracie',
+                                                    'Oceano Jiu-Jitsu',
                                                     'Arena PvP',
                                                     'Loja Oficial',
                                                     'Hall da Fama',
@@ -1028,8 +1028,8 @@ fun ClientSimulatorTab(
                                                         switch(currentEnv) {
                                                             case 'Praça Central':
                                                                 return { floor: 0x14532D, border: 0x166534, tag: 'SOCIAL' };
-                                                            case 'Academia Carlson Gracie':
-                                                                return { floor: 0x1e3a8a, border: 0xd97706, tag: 'BJJ_CLASSIC' };
+                                                            case 'Oceano Jiu-Jitsu':
+                                                                return { floor: 0x2563eb, border: 0x0f172a, tag: 'OCEAN_DOJO' };
                                                             case 'Arena PvP':
                                                                 return { floor: 0x0f172a, border: 0x06b6d4, tag: 'STADIUM' };
                                                             case 'Loja Oficial':
@@ -1076,8 +1076,20 @@ fun ClientSimulatorTab(
                                                                  let textureKey = 'floor_stone_brick';
                                                                  if (currentEnv === 'Praça Central') {
                                                                      textureKey = (x === 14 || y === 14) ? 'nature_water' : 'nature_grass_clove';
-                                                                 } else if (currentEnv === 'Academia Carlson Gracie') {
-                                                                     textureKey = 'floor_checker_blue';
+                                                                 } else if (currentEnv === 'Academia Carlson Gracie' || currentEnv === 'Oceano Jiu-Jitsu') {
+                                                                     if (currentEnv === 'Oceano Jiu-Jitsu') {
+                                                                         if (x < 3 || y < 3) {
+                                                                             textureKey = 'nature_water'; // Blue ocean view
+                                                                         } else if (x === 3 || y === 3) {
+                                                                             textureKey = 'floor_mud'; // Sand beach
+                                                                         } else if (x >= 6 && x <= 12 && y >= 6 && y <= 12) {
+                                                                             textureKey = 'floor_checker_blue'; // Blue & Black Mat
+                                                                         } else {
+                                                                             textureKey = 'floor_wood_plank'; // Premium wood floor border
+                                                                         }
+                                                                     } else {
+                                                                         textureKey = 'floor_checker_blue';
+                                                                     }
                                                                  } else if (currentEnv === 'Arena PvP') {
                                                                      textureKey = 'floor_stone_brick';
                                                                  } else if (currentEnv === 'Loja Oficial') {
@@ -1102,7 +1114,7 @@ fun ClientSimulatorTab(
                                                                      let windowKey = 'window_arched_glass';
                                                                      let roofKey = 'roof_slate_blue';
 
-                                                                     if (currentEnv === 'Academia Carlson Gracie') {
+                                                                     if (currentEnv === 'Academia Carlson Gracie' || currentEnv === 'Oceano Jiu-Jitsu') {
                                                                          wallKey = 'wall_panel_wood';
                                                                          doorKey = 'door_wood_stud';
                                                                          windowKey = 'window_arched_glass';
@@ -1335,7 +1347,7 @@ fun ClientSimulatorTab(
                                                          }
 
                                                          // Obstacle at (2,2) in Academia Carlson Gracie
-                                                         if (targetX === 2 && targetY === 2 && currentEnv === 'Academia Carlson Gracie') {
+                                                         if (targetX === 2 && targetY === 2 && (currentEnv === 'Academia Carlson Gracie' || currentEnv === 'Oceano Jiu-Jitsu')) {
                                                              this.cameras.main.shake(80, 0.003);
                                                              return; // Locked obstacle
                                                          }
@@ -1463,6 +1475,7 @@ fun ClientSimulatorTab(
                                                     getEnvironmentColors() {
                                                         switch(currentEnv) {
                                                             case 'Praça Central': return { floor: '#14532D', border: '#166534' };
+                                                            case 'Oceano Jiu-Jitsu': return { floor: '#2563eb', border: '#0f172a' };
                                                             case 'Academia Carlson Gracie': return { floor: '#1e3a8a', border: '#d97706' };
                                                             case 'Arena PvP': return { floor: '#0f172a', border: '#06b6d4' };
                                                             case 'Loja Oficial': return { floor: '#78350f', border: '#fab23c' };
@@ -1613,7 +1626,7 @@ fun ClientSimulatorTab(
                                                             return;
                                                         }
 
-                                                        if (targetX === 2 && targetY === 2 && currentEnv === 'Academia Carlson Gracie') {
+                                                        if (targetX === 2 && targetY === 2 && (currentEnv === 'Academia Carlson Gracie' || currentEnv === 'Oceano Jiu-Jitsu')) {
                                                             return;
                                                         }
 
@@ -1640,7 +1653,7 @@ fun ClientSimulatorTab(
                                                     }
 
                                                     triggerTeleportPortal() {
-                                                        const nextRoom = (currentEnv === 'Academia Carlson Gracie') ? 'Arena PvP' : 'Academia Carlson Gracie';
+                                                        const nextRoom = (currentEnv === 'Oceano Jiu-Jitsu') ? 'Arena PvP' : 'Oceano Jiu-Jitsu';
                                                         currentEnv = nextRoom;
                                                         playerX = 7;
                                                         playerY = 7;
@@ -1982,12 +1995,11 @@ fun ClientSimulatorTab(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = if (showConsoleLogs) "▼" else "▲",
-                                color = BlueprintCyan,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.width(12.dp)
+                            Icon(
+                                imageVector = if (showConsoleLogs) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                contentDescription = "Toggle Console",
+                                tint = BlueprintCyan,
+                                modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(

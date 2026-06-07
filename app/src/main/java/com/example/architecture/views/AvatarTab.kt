@@ -10,6 +10,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,9 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.TrackChanges
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -68,6 +72,19 @@ import com.example.ui.theme.BlueprintRed
 import com.example.ui.theme.BlueprintTeal
 import com.example.ui.theme.BlueprintTextPrimary
 import com.example.ui.theme.BlueprintTextSecondary
+
+data class BeltRoadmapCard(
+    val id: String,
+    val beltName: String,
+    val slogan: String,
+    val badgeColor: Color,
+    val textBadgeColor: Color,
+    val skinId: String,
+    val uniformId: String,
+    val accessoryId: String,
+    val prestigeMultiplier: String,
+    val difficulty: String
+)
 
 data class CustomizableOption(
     val id: String,
@@ -187,42 +204,335 @@ fun AvatarTab(
             .padding(14.dp)
             .verticalScroll(scrollState)
     ) {
-        SectionHeader(
-            title = "Desenhos de Customização e Avatar",
-            subtitle = "Sistemas de Customização Estética de Combatentes, Raridades e Progressão de Faixas"
-        )
-
-        // General Avatar Statement
-        Row(
+        // JIUVERSE HERO HEADER (IMAGE 1 EXCL)
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF0F172A), RoundedCornerShape(8.dp))
-                .border(0.5.dp, BlueprintCyan.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .background(Color(0xFF030712), RoundedCornerShape(8.dp))
+                .border(1.dp, BlueprintCyan, RoundedCornerShape(8.dp))
+                .padding(16.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Accessibility,
-                contentDescription = null,
-                tint = BlueprintTeal,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Column {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(
-                    text = "VISÃO DIRETOR ARTÍSTICO (CHARACTER ART)",
+                    text = "JIUVERSE",
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Black,
+                    color = BlueprintCyan,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 4.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "CHOOSE YOUR AVATAR. LIVE YOUR JOURNEY.",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = BlueprintTeal,
-                    fontFamily = FontFamily.Monospace
-                )
-                Text(
-                    text = "No JiuVerse, o visual do lutador espelha seu peso e prestígio. Das faixas comuns (obtenção linear) aos pets míticos (itens raros de conquistas estelares), todas as camadas usam canais de desenho de baixo custo.",
-                    fontSize = 11.sp,
-                    color = BlueprintTextSecondary
+                    fontFamily = FontFamily.SansSerif,
+                    letterSpacing = 2.sp
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // FIGHTERS RANK JOURNEY GRID (THE 5 BELTS CARDS AS SEEN IN IMAGE 1)
+        Text(
+            text = "COLEÇÃO EXCLUSIVA JIUVERSE JORNADA DE FAIXAS",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Black,
+            color = BlueprintCyan,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        // Custom horizontal list or beautiful responsive cards for White, Blue, Purple, Brown, Black belts
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val beltRoadmap = listOf(
+                com.example.architecture.views.BeltRoadmapCard(
+                    id = "f1",
+                    beltName = "WHITE BELT",
+                    slogan = "EVERY JOURNEY BEGINS HERE.",
+                    badgeColor = Color(0xFFF1F5F9),
+                    textBadgeColor = Color(0xFF0F172A),
+                    skinId = "s1",
+                    uniformId = "u1", // Branco Clássico
+                    accessoryId = "a1",
+                    prestigeMultiplier = "1.0x",
+                    difficulty = "Iniciante"
+                ),
+                com.example.architecture.views.BeltRoadmapCard(
+                    id = "f2",
+                    beltName = "BLUE BELT",
+                    slogan = "TECHNIQUE. DISCIPLINE. EVOLUTION.",
+                    badgeColor = Color(0xFF2563EB),
+                    textBadgeColor = Color.White,
+                    skinId = "s2",
+                    uniformId = "u4", // Azul Competidor
+                    accessoryId = "a2",
+                    prestigeMultiplier = "1.5x",
+                    difficulty = "Graduado"
+                ),
+                com.example.architecture.views.BeltRoadmapCard(
+                    id = "f3",
+                    beltName = "PURPLE BELT",
+                    slogan = "CONFIDENCE. CONTROL. GROWTH.",
+                    badgeColor = Color(0xFF7C3AED),
+                    textBadgeColor = Color.White,
+                    skinId = "s1",
+                    uniformId = "u2", // Rashguard Samurai
+                    accessoryId = "a5",
+                    prestigeMultiplier = "2.2x",
+                    difficulty = "Guardeiro"
+                ),
+                com.example.architecture.views.BeltRoadmapCard(
+                    id = "f4",
+                    beltName = "BROWN BELT",
+                    slogan = "EXPERIENCE. AWARENESS. LEADERSHIP.",
+                    badgeColor = Color(0xFF78350F),
+                    textBadgeColor = Color.White,
+                    skinId = "s3",
+                    uniformId = "u1", // Branco Clássico
+                    accessoryId = "a3",
+                    prestigeMultiplier = "3.5x",
+                    difficulty = "Passador"
+                ),
+                com.example.architecture.views.BeltRoadmapCard(
+                    id = "f5",
+                    beltName = "BLACK BELT",
+                    slogan = "MASTERY. LEGACY. JIU FOR LIFE.",
+                    badgeColor = Color(0xFF0F172A),
+                    textBadgeColor = Color(0xFFEF4444), // red strip
+                    skinId = "s2",
+                    uniformId = "u5", // Kimono Preto Experiente
+                    accessoryId = "a6",
+                    prestigeMultiplier = "5.0x",
+                    difficulty = "Faixa Preta"
+                )
+            )
+
+            beltRoadmap.forEach { rank ->
+                val isSelectedInEngine = activeBelt.id == rank.id
+                Card(
+                    modifier = Modifier
+                        .width(200.dp)
+                        .border(
+                            1.dp,
+                            if (isSelectedInEngine) BlueprintTeal else BlueprintGridLine,
+                            RoundedCornerShape(8.dp)
+                        )
+                        .clickable {
+                            // Automatically Equip all configurations of that Rank preset!
+                            activeSkin = customizableItems.first { it.id == rank.skinId }
+                            val foundUniform = customizableItems.firstOrNull { it.id == rank.uniformId }
+                            if (foundUniform != null) activeUniform = foundUniform
+                            activeBelt = customizableItems.first { it.id == rank.id }
+                            activeAccessory = customizableItems.first { it.id == rank.accessoryId }
+                            currentAnimationState = "CONFIANTE"
+                            activeDirection = "FRENTE"
+                        },
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelectedInEngine) Color(0xFF0F172A) else Color(0xFF030712)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        // Rank Header Badge
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(rank.badgeColor, RoundedCornerShape(4.dp))
+                                .padding(vertical = 4.dp, horizontal = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = rank.beltName,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black,
+                                color = rank.textBadgeColor,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Slogan
+                        Text(
+                            text = rank.slogan,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = BlueprintTextPrimary,
+                            lineHeight = 11.sp,
+                            minLines = 2
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Status indicators
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                            modifier = Modifier
+                                .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                                .padding(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Prestígio:", fontSize = 8.sp, color = BlueprintTextSecondary)
+                                Text(rank.prestigeMultiplier, fontSize = 8.sp, color = BlueprintTeal, fontWeight = FontWeight.Bold)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Classe:", fontSize = 8.sp, color = BlueprintTextSecondary)
+                                Text(rank.difficulty, fontSize = 8.sp, color = BlueprintCyan, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Equip Button
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (isSelectedInEngine) BlueprintTeal.copy(alpha = 0.2f) else BlueprintCyan.copy(alpha = 0.1f),
+                                    RoundedCornerShape(4.dp)
+                                )
+                                .border(
+                                    0.5.dp,
+                                    if (isSelectedInEngine) BlueprintTeal else BlueprintGridLine,
+                                    RoundedCornerShape(4.dp)
+                                )
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (isSelectedInEngine) "✓ ATIVO NO SIMULADOR" else "EXPERIMENTAR FAIXA 🥋",
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Black,
+                                color = if (isSelectedInEngine) BlueprintTeal else BlueprintCyan
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // JIUVERSE: A UNIVERSE FOR THE DEDICATED (BRAND CORE CARD FROM IMAGE 1)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, BlueprintCyan, RoundedCornerShape(8.dp)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF030712)),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(16.dp)
+                            .background(BlueprintCyan, CircleShape)
+                            .border(1.5.dp, Color.White, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(Color.White, CircleShape)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "JIUVERSE",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black,
+                        color = BlueprintCyan,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 2.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = "A UNIVERSE FOR THE DEDICATED.",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    color = BlueprintTextPrimary
+                )
+
+                Text(
+                    text = "Built on technique, tested on the mat, united by jiu-jitsu.",
+                    fontSize = 11.sp,
+                    color = BlueprintTextSecondary
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Four visual pillars as outlined in Image 1
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        Triple(Icons.Default.Accessibility, "CUSTOMIZE YOUR AVATAR", "Express your combat identity."),
+                        Triple(Icons.Default.Group, "JOIN A GLOBAL COMMUNITY", "Connect with active fighters."),
+                        Triple(Icons.Default.TrackChanges, "TRACK YOUR PROGRESS", "Record mat workouts securely."),
+                        Triple(Icons.Default.EmojiEvents, "EARN YOUR PLACE", "Compete inside the ranked PVP Arenas.")
+                    ).forEach { (icon, title, desc) ->
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                                .border(0.5.dp, BlueprintGridLine, RoundedCornerShape(4.dp))
+                                .padding(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = BlueprintTeal,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = title,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = BlueprintCyan,
+                                maxLines = 1,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = desc,
+                                fontSize = 7.5.sp,
+                                color = BlueprintTextSecondary,
+                                lineHeight = 9.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
 
         Spacer(modifier = Modifier.height(10.dp))
 
