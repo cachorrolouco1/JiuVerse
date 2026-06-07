@@ -598,6 +598,7 @@ fun ClientSimulatorTab(
                                     settings.domStorageEnabled = true
                                     settings.useWideViewPort = true
                                     settings.loadWithOverviewMode = true
+                                    settings.mixedContentMode = 0 // MIXED_CONTENT_ALWAYS_ALLOW
 
                                     addJavascriptInterface(object : Any() {
                                         @JavascriptInterface
@@ -633,13 +634,25 @@ fun ClientSimulatorTab(
                                         <html>
                                         <head>
                                             <meta charset="UTF-8">
+                                            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
                                             <style>
-                                                body { margin: 0; padding: 0; background-color: #020617; overflow: hidden; }
+                                                body { margin: 0; padding: 0; background-color: #020617; overflow: hidden; width: 100vw; height: 100vh; }
                                                 canvas { display: block; width: 100%; height: 100%; }
+                                                #canvas-fallback {
+                                                    display: none;
+                                                    position: absolute;
+                                                    top: 0;
+                                                    left: 0;
+                                                    width: 100%;
+                                                    height: 100%;
+                                                    background-color: #020617;
+                                                }
                                             </style>
                                             <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
                                         </head>
                                         <body>
+                                            <canvas id="canvas-fallback"></canvas>
+
                                             <script>
                                                 // 64x32 Dimetric Isometric Grid (2:1 projection) Config
                                                 const T_WIDTH = 64;
@@ -651,13 +664,291 @@ fun ClientSimulatorTab(
                                                 let playerY = 8;
                                                 let currentEnv = 'Academia Carlson Gracie';
                                                 let playerBelt = 'Branca';
+                                                let engineType = 'PHASER'; // 'PHASER' or 'CANVAS'
+
+                                                const environmentsCycle = [
+                                                    'Praça Central',
+                                                    'Academia Carlson Gracie',
+                                                    'Arena PvP',
+                                                    'Loja Oficial',
+                                                    'Hall da Fama',
+                                                    'Casas Futuras'
+                                                ];
 
                                                 class JiuVerseIsoGame extends Phaser.Scene {
                                                     constructor() {
                                                         super('JiuVerseIsoGame');
                                                     }
 
-                                                    preload() {}
+                                                    preload() {
+                                                         this.createProceduralTextures();
+                                                     }
+
+                                                     createProceduralTextures() {
+                                                         const makeTile = (name, drawFn) => {
+                                                             const canvas = document.createElement('canvas');
+                                                             canvas.width = 64;
+                                                             canvas.height = 32;
+                                                             const ctx = canvas.getContext('2d');
+                                                             
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(32, 0);
+                                                             ctx.lineTo(64, 16);
+                                                             ctx.lineTo(32, 32);
+                                                             ctx.lineTo(0, 16);
+                                                             ctx.closePath();
+                                                             ctx.clip();
+                                                             
+                                                             drawFn(ctx);
+                                                             this.textures.addCanvas(name, canvas);
+                                                         };
+
+                                                         const makeBlock = (name, drawFn) => {
+                                                             const canvas = document.createElement('canvas');
+                                                             canvas.width = 64;
+                                                             canvas.height = 80;
+                                                             const ctx = canvas.getContext('2d');
+                                                             drawFn(ctx);
+                                                             this.textures.addCanvas(name, canvas);
+                                                         };
+
+                                                         // --- PISOS ---
+                                                         makeTile('floor_stone_brick', (ctx) => {
+                                                             ctx.fillStyle = '#475569';
+                                                             ctx.fillRect(0, 0, 64, 32);
+                                                             ctx.strokeStyle = '#334155';
+                                                             ctx.lineWidth = 1;
+                                                             for (let i = -32; i < 96; i += 8) {
+                                                                 ctx.beginPath(); ctx.moveTo(i, -16); ctx.lineTo(i - 32, 48); ctx.stroke();
+                                                                 ctx.beginPath(); ctx.moveTo(i, -16); ctx.lineTo(i + 32, 48); ctx.stroke();
+                                                             }
+                                                         });
+
+                                                         makeTile('floor_wood_plank', (ctx) => {
+                                                             ctx.fillStyle = '#78350f';
+                                                             ctx.fillRect(0, 0, 64, 32);
+                                                             ctx.strokeStyle = '#451a03';
+                                                             ctx.lineWidth = 1.5;
+                                                             for (let y = 0; y < 32; y += 4) {
+                                                                 ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(64, y); ctx.stroke();
+                                                             }
+                                                             ctx.strokeStyle = '#1e0801';
+                                                             for (let x = 8; x < 64; x += 16) {
+                                                                 ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 32); ctx.stroke();
+                                                             }
+                                                         });
+
+                                                         makeTile('floor_checker_blue', (ctx) => {
+                                                             ctx.fillStyle = '#1e3a8a';
+                                                             ctx.fillRect(0, 0, 64, 32);
+                                                             ctx.fillStyle = '#f8fafc';
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(32, 0); ctx.lineTo(64, 16); ctx.lineTo(32, 16);
+                                                             ctx.closePath(); ctx.fill();
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(32, 16); ctx.lineTo(0, 16); ctx.lineTo(32, 32);
+                                                             ctx.closePath(); ctx.fill();
+                                                             ctx.strokeStyle = '#d97706';
+                                                             ctx.lineWidth = 1.5;
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(32, 0); ctx.lineTo(64, 16); ctx.lineTo(32, 32); ctx.lineTo(0, 16);
+                                                             ctx.closePath(); ctx.stroke();
+                                                         });
+
+                                                         makeTile('floor_checker_grey', (ctx) => {
+                                                             ctx.fillStyle = '#cbd5e1';
+                                                             ctx.fillRect(0, 0, 64, 32);
+                                                             ctx.fillStyle = '#64748b';
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(32, 0); ctx.lineTo(48, 8); ctx.lineTo(32, 16); ctx.lineTo(16, 8);
+                                                             ctx.closePath(); ctx.fill();
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(32, 16); ctx.lineTo(48, 24); ctx.lineTo(32, 32); ctx.lineTo(16, 24);
+                                                             ctx.closePath(); ctx.fill();
+                                                         });
+
+                                                         makeTile('floor_mud', (ctx) => {
+                                                             ctx.fillStyle = '#451a03';
+                                                             ctx.fillRect(0, 0, 64, 32);
+                                                             ctx.fillStyle = '#78716c';
+                                                             ctx.beginPath(); ctx.arc(15, 8, 3, 0, Math.PI*2); ctx.fill();
+                                                             ctx.beginPath(); ctx.arc(48, 20, 4, 0, Math.PI*2); ctx.fill();
+                                                         });
+
+                                                         makeTile('nature_grass_clove', (ctx) => {
+                                                             ctx.fillStyle = '#15803d';
+                                                             ctx.fillRect(0, 0, 64, 32);
+                                                             ctx.fillStyle = '#4ade80';
+                                                             const drawClover = (cx, cy) => {
+                                                                 ctx.beginPath();
+                                                                 ctx.arc(cx - 2, cy, 2, 0, Math.PI*2);
+                                                                 ctx.arc(cx + 2, cy, 2, 0, Math.PI*2);
+                                                                 ctx.arc(cx, cy - 2, 2, 0, Math.PI*2);
+                                                                 ctx.fill();
+                                                             };
+                                                             drawClover(12, 10);
+                                                             drawClover(45, 22);
+                                                             drawClover(25, 24);
+                                                         });
+
+                                                         makeTile('nature_water', (ctx) => {
+                                                             ctx.fillStyle = '#0f766e';
+                                                             ctx.fillRect(0, 0, 64, 32);
+                                                             ctx.strokeStyle = '#2dd4bf';
+                                                             ctx.lineWidth = 1;
+                                                             ctx.beginPath();
+                                                             ctx.arc(16, 8, 8, 0, Math.PI/3);
+                                                             ctx.arc(48, 8, 12, 0, Math.PI/4);
+                                                             ctx.stroke();
+                                                         });
+
+                                                         // --- EXTRUSÕES 3D (WALLS & ITEMS) ---
+                                                         const drawFacade = (ctx, cl, cr, ct) => {
+                                                             // Top cap
+                                                             ctx.fillStyle = ct;
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(32, 0); ctx.lineTo(64, 16); ctx.lineTo(32, 32); ctx.lineTo(0, 16);
+                                                             ctx.closePath(); ctx.fill();
+                                                             // Left Facade
+                                                             ctx.fillStyle = cl;
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(0, 16); ctx.lineTo(32, 32); ctx.lineTo(32, 80); ctx.lineTo(0, 64);
+                                                             ctx.closePath(); ctx.fill();
+                                                             // Right Facade
+                                                             ctx.fillStyle = cr;
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(32, 32); ctx.lineTo(64, 16); ctx.lineTo(64, 64); ctx.lineTo(32, 80);
+                                                             ctx.closePath(); ctx.fill();
+                                                         };
+
+                                                         makeBlock('wall_cobble', (ctx) => {
+                                                             drawFacade(ctx, '#1e293b', '#334155', '#475569');
+                                                             ctx.strokeStyle = '#0f172a';
+                                                             ctx.lineWidth = 1;
+                                                             ctx.beginPath();
+                                                             ctx.arc(12, 45, 5, 0, Math.PI*2);
+                                                             ctx.arc(48, 48, 6, 0, Math.PI*2);
+                                                             ctx.stroke();
+                                                         });
+
+                                                         makeBlock('wall_brick_red', (ctx) => {
+                                                             drawFacade(ctx, '#7c2d12', '#9a3412', '#b45309');
+                                                             ctx.strokeStyle = '#451a03';
+                                                             ctx.lineWidth = 1;
+                                                             for (let y = 24; y < 80; y += 8) {
+                                                                 ctx.beginPath(); ctx.moveTo(0, y - 8); ctx.lineTo(32, y); ctx.stroke();
+                                                                 ctx.beginPath(); ctx.moveTo(32, y); ctx.lineTo(64, y - 8); ctx.stroke();
+                                                             }
+                                                         });
+
+                                                         makeBlock('wall_panel_wood', (ctx) => {
+                                                             drawFacade(ctx, '#451a03', '#78350f', '#a16207');
+                                                             ctx.strokeStyle = '#1c0a00';
+                                                             ctx.lineWidth = 1.5;
+                                                             for (let x = 8; x < 32; x += 8) {
+                                                                 ctx.beginPath(); ctx.moveTo(x, 16 + x/2); ctx.lineTo(x, 64 + x/2); ctx.stroke();
+                                                             }
+                                                             for (let x = 40; x < 64; x += 8) {
+                                                                 ctx.beginPath(); ctx.moveTo(x, 32 - (x-32)/2); ctx.lineTo(x, 80 - (x-32)/2); ctx.stroke();
+                                                             }
+                                                         });
+
+                                                         makeBlock('door_wood_stud', (ctx) => {
+                                                             drawFacade(ctx, '#27272a', '#3f1b07', '#18181b');
+                                                             ctx.fillStyle = '#b45309';
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(36, 34); ctx.lineTo(60, 22); ctx.lineTo(60, 68); ctx.lineTo(36, 80);
+                                                             ctx.closePath(); ctx.fill();
+                                                             ctx.strokeStyle = '#451a03';
+                                                             ctx.stroke();
+                                                         });
+
+                                                         makeBlock('door_bars', (ctx) => {
+                                                             drawFacade(ctx, '#0f172a', '#1e293b', '#334155');
+                                                             ctx.fillStyle = '#020617';
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(36, 34); ctx.lineTo(60, 22); ctx.lineTo(60, 62); ctx.lineTo(36, 74);
+                                                             ctx.closePath(); ctx.fill();
+                                                             ctx.strokeStyle = '#94a3b8';
+                                                             ctx.lineWidth = 2;
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(48, 23); ctx.lineTo(48, 68);
+                                                             ctx.stroke();
+                                                         });
+
+                                                         makeBlock('door_arched', (ctx) => {
+                                                             drawFacade(ctx, '#27272a', '#020617', '#18181b');
+                                                             ctx.fillStyle = '#5c2b09';
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(34, 76); ctx.lineTo(34, 38);
+                                                             ctx.bezierCurveTo(34, 24, 62, 12, 62, 26);
+                                                             ctx.lineTo(62, 64);
+                                                             ctx.closePath(); ctx.fill();
+                                                         });
+
+                                                         makeBlock('window_arched_glass', (ctx) => {
+                                                             drawFacade(ctx, '#3f1b07', '#5c2b09', '#1a0d00');
+                                                             ctx.fillStyle = '#38bdf8';
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(38, 54); ctx.lineTo(38, 38);
+                                                             ctx.bezierCurveTo(38, 28, 58, 16, 58, 28);
+                                                             ctx.lineTo(58, 44);
+                                                             ctx.closePath(); ctx.fill();
+                                                             ctx.strokeStyle = '#fbbf24';
+                                                             ctx.stroke();
+                                                         });
+
+                                                         makeBlock('window_bar_jail', (ctx) => {
+                                                             drawFacade(ctx, '#1e293b', '#334155', '#475569');
+                                                             ctx.fillStyle = '#0f172a';
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(38, 28); ctx.lineTo(58, 18); ctx.lineTo(58, 48); ctx.lineTo(38, 58);
+                                                             ctx.closePath(); ctx.fill();
+                                                         });
+
+                                                         makeBlock('window_cozy_glow', (ctx) => {
+                                                             drawFacade(ctx, '#7c2d12', '#9a3412', '#b45309');
+                                                             ctx.fillStyle = '#fef08a';
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(38, 28); ctx.lineTo(58, 18); ctx.lineTo(58, 48); ctx.lineTo(38, 58);
+                                                             ctx.closePath(); ctx.fill();
+                                                             ctx.strokeStyle = '#451a03';
+                                                             ctx.stroke();
+                                                         });
+
+                                                         makeBlock('window_boarded', (ctx) => {
+                                                             drawFacade(ctx, '#1e293b', '#334155', '#475569');
+                                                             ctx.fillStyle = '#18181b';
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(38, 28); ctx.lineTo(58, 18); ctx.lineTo(58, 48); ctx.lineTo(38, 58);
+                                                             ctx.closePath(); ctx.fill();
+                                                         });
+
+                                                         makeBlock('roof_slate_blue', (ctx) => {
+                                                             ctx.fillStyle = '#1e293b';
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(32, 0); ctx.lineTo(64, 48); ctx.lineTo(32, 64); ctx.lineTo(0, 48);
+                                                             ctx.closePath(); ctx.fill();
+                                                             ctx.strokeStyle = '#334155';
+                                                             for (let y = 16; y < 60; y += 8) {
+                                                                 ctx.beginPath(); ctx.arc(32, y, 16, 0, Math.PI, false); ctx.stroke();
+                                                             }
+                                                         });
+
+                                                         makeBlock('roof_thatch_gold', (ctx) => {
+                                                             ctx.fillStyle = '#a16207';
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(32, 0); ctx.lineTo(64, 48); ctx.lineTo(32, 64); ctx.lineTo(0, 48);
+                                                             ctx.closePath(); ctx.fill();
+                                                         });
+
+                                                         makeBlock('roof_shingle_brown', (ctx) => {
+                                                             ctx.fillStyle = '#7c2d12';
+                                                             ctx.beginPath();
+                                                             ctx.moveTo(32, 0); ctx.lineTo(64, 48); ctx.lineTo(32, 64); ctx.lineTo(0, 48);
+                                                             ctx.closePath(); ctx.fill();
+                                                         });
+                                                     }
 
                                                     create() {
                                                         this.cameras.main.setBackgroundColor('#020617');
@@ -725,7 +1016,119 @@ fun ClientSimulatorTab(
                                                         }
                                                     }
 
-                                                    renderIsometricMap() {
+                                                     renderIsometricMap() {
+                                                         // Destroy old tiles
+                                                         this.tileGroup.clear(true, true);
+
+                                                         // Draw 15x15 Isometric cells with retro textured tiles
+                                                         for(let x=0; x<GRID_SIZE; x++) {
+                                                             for(let y=0; y<GRID_SIZE; y++) {
+                                                                 const posX = (x - y) * this.wHalf + this.originX;
+                                                                 const posY = (x + y) * this.hHalf + this.originY;
+
+                                                                 // Classification/Zoning mapping:
+                                                                 let textureKey = 'floor_stone_brick';
+                                                                 if (currentEnv === 'Praça Central') {
+                                                                     textureKey = (x === 14 || y === 14) ? 'nature_water' : 'nature_grass_clove';
+                                                                 } else if (currentEnv === 'Academia Carlson Gracie') {
+                                                                     textureKey = 'floor_checker_blue';
+                                                                 } else if (currentEnv === 'Arena PvP') {
+                                                                     textureKey = 'floor_stone_brick';
+                                                                 } else if (currentEnv === 'Loja Oficial') {
+                                                                     textureKey = 'floor_wood_plank';
+                                                                 } else if (currentEnv === 'Hall da Fama') {
+                                                                     textureKey = 'floor_checker_grey';
+                                                                 } else if (currentEnv === 'Casas Futuras') {
+                                                                     textureKey = 'floor_mud';
+                                                                 } else {
+                                                                     textureKey = 'floor_mud';
+                                                                 }
+
+                                                                 // Draw the floor tile
+                                                                 const tile = this.add.image(posX, posY, textureKey);
+                                                                 tile.depth = (x + y) * 2;
+                                                                 this.tileGroup.add(tile);
+
+                                                                 // Draw boundary walls, windows, and doors along x === 0 and y === 0 edges
+                                                                 if (x === 0 || y === 0) {
+                                                                     let wallKey = 'wall_cobble';
+                                                                     let doorKey = 'door_wood_stud';
+                                                                     let windowKey = 'window_arched_glass';
+                                                                     let roofKey = 'roof_slate_blue';
+
+                                                                     if (currentEnv === 'Academia Carlson Gracie') {
+                                                                         wallKey = 'wall_panel_wood';
+                                                                         doorKey = 'door_wood_stud';
+                                                                         windowKey = 'window_arched_glass';
+                                                                         roofKey = 'roof_thatch_gold';
+                                                                     } else if (currentEnv === 'Arena PvP') {
+                                                                         wallKey = 'wall_cobble';
+                                                                         doorKey = 'door_bars';
+                                                                         windowKey = 'window_bar_jail';
+                                                                         roofKey = 'roof_slate_blue';
+                                                                     } else if (currentEnv === 'Praça Central') {
+                                                                         wallKey = 'wall_cobble';
+                                                                         doorKey = 'door_wood_stud';
+                                                                         windowKey = 'window_boarded';
+                                                                         roofKey = 'roof_thatch_gold';
+                                                                     } else if (currentEnv === 'Loja Oficial') {
+                                                                         wallKey = 'wall_brick_red';
+                                                                         doorKey = 'door_wood_stud';
+                                                                         windowKey = 'window_cozy_glow';
+                                                                         roofKey = 'roof_shingle_brown';
+                                                                     } else if (currentEnv === 'Hall da Fama') {
+                                                                         wallKey = 'wall_cobble';
+                                                                         doorKey = 'door_arched';
+                                                                         windowKey = 'window_arched_glass';
+                                                                         roofKey = 'roof_slate_blue';
+                                                                     } else if (currentEnv === 'Casas Futuras') {
+                                                                         wallKey = 'wall_brick_red';
+                                                                         doorKey = 'door_wood_stud';
+                                                                         windowKey = 'window_cozy_glow';
+                                                                         roofKey = 'roof_shingle_brown';
+                                                                     }
+
+                                                                     // Setups portals/intersections
+                                                                     if (x === 0 && y === 5) {
+                                                                         const door = this.add.image(posX, posY - 24, doorKey);
+                                                                         door.depth = (x + y) * 2 + 1;
+                                                                         this.tileGroup.add(door);
+
+                                                                         const portalText = this.add.text(posX, posY - 58, "PORTAL", {
+                                                                             fontSize: '10px',
+                                                                             fontFamily: 'monospace',
+                                                                             color: '#f43f5e',
+                                                                             backgroundColor: '#18181b',
+                                                                             padding: { x: 4, y: 2 }
+                                                                         }).setOrigin(0.5);
+                                                                         portalText.depth = (x + y) * 2 + 10;
+                                                                         this.tileGroup.add(portalText);
+                                                                     }
+                                                                     // High windows placement on boundary wall
+                                                                     else if (x === 0 && (y === 2 || y === 8 || y === 12)) {
+                                                                         const win = this.add.image(posX, posY - 24, windowKey);
+                                                                         win.depth = (x + y) * 2 + 1;
+                                                                         this.tileGroup.add(win);
+                                                                     }
+                                                                     // Block brick sections
+                                                                     else {
+                                                                         const wall = this.add.image(posX, posY - 24, wallKey);
+                                                                         wall.depth = (x + y) * 2 + 1;
+                                                                         this.tileGroup.add(wall);
+
+                                                                         // Roof placement
+                                                                         if (currentEnv !== 'Praça Central') {
+                                                                             const roof = this.add.image(posX, posY - 48, roofKey);
+                                                                             roof.depth = (x + y) * 2 + 2;
+                                                                             this.tileGroup.add(roof);
+                                                                         }
+                                                                     }
+                                                                 }
+                                                             }
+                                                         }
+                                                     }
+
+                                                     originalIsometricMap() {
                                                         // Destroy old tiles
                                                         this.tileGroup.clear(true, true);
 
@@ -873,6 +1276,83 @@ fun ClientSimulatorTab(
 
                                                     // Corner Sliding Vector alignment on collision
                                                     movePlayerTo(targetX, targetY) {
+                                                         // Collision limits boundaries checking
+                                                         if (targetX < 0 || targetX >= GRID_SIZE || targetY < 0 || targetY >= GRID_SIZE) {
+                                                             this.cameras.main.shake(80, 0.003);
+                                                             return;
+                                                         }
+
+                                                         // Solid elements blocks collision (3D physical walls & windows along x===0 or y===0, except portal door at x===0, y===5)
+                                                         if ((targetX === 0 || targetY === 0) && !(targetX === 0 && targetY === 5)) {
+                                                             this.cameras.main.shake(80, 0.003);
+                                                             return; // Collision with textured Kenney tileset wall
+                                                         }
+
+                                                         // Obstacle at (2,2) in Academia Carlson Gracie
+                                                         if (targetX === 2 && targetY === 2 && currentEnv === 'Academia Carlson Gracie') {
+                                                             this.cameras.main.shake(80, 0.003);
+                                                             return; // Locked obstacle
+                                                         }
+
+                                                         this.isMoving = true;
+                                                         playerX = targetX;
+                                                         playerY = targetY;
+
+                                                         const pxX = (playerX - playerY) * this.wHalf + this.originX;
+                                                         const pxY = (playerX + playerY) * this.hHalf + this.originY;
+
+                                                         this.tweens.add({
+                                                             targets: this.playerVisual,
+                                                             x: pxX,
+                                                             y: pxY,
+                                                             duration: 200,
+                                                             onComplete: () => {
+                                                                 this.isMoving = false;
+                                                                 this.playerVisual.depth = (playerX + playerY) * 2 + 3;
+
+                                                                 // Notify Android layer
+                                                                 if(window.AndroidWebView) {
+                                                                     window.AndroidWebView.postMessage(JSON.stringify({
+                                                                         type: 'PLAYER_MOVE',
+                                                                         x: playerX,
+                                                                         y: playerY
+                                                                     }));
+                                                                 }
+
+                                                                 // Trigger portal teletransports triggers!
+                                                                 if (playerX === 0 && playerY === 5) {
+                                                                     this.triggerTeleportPortal();
+                                                                 }
+                                                             }
+                                                         });
+                                                     }
+
+                                                     triggerTeleportPortal() {
+                                                         this.cameras.main.fadeOut(300, 0, 0, 0);
+                                                         this.cameras.main.once('camerafadeoutcomplete', () => {
+                                                             let index = environmentsCycle.indexOf(currentEnv);
+                                                             if (index === -1) index = 0;
+                                                             const nextRoom = environmentsCycle[(index + 1) % environmentsCycle.length];
+                                                             currentEnv = nextRoom;
+                                                             playerX = 7;
+                                                             playerY = 7;
+
+                                                             this.renderIsometricMap();
+                                                             this.renderPlayerAvatar();
+                                                             this.cameras.main.fadeIn(300);
+
+                                                             if (window.AndroidWebView) {
+                                                                 window.AndroidWebView.postMessage(JSON.stringify({
+                                                                     type: 'ENV_CHANGE',
+                                                                     env: nextRoom,
+                                                                     x: 7,
+                                                                     y: 7
+                                                                 }));
+                                                             }
+                                                         });
+                                                     }
+
+                                                     originalMovePlayerTo(targetX, targetY) {
                                                         // Collision limits boundaries checking
                                                         if (targetX < 0 || targetX >= GRID_SIZE || targetY < 0 || targetY >= GRID_SIZE) {
                                                             this.cameras.main.shake(80, 0.003);
@@ -965,48 +1445,320 @@ fun ClientSimulatorTab(
                                                     }
                                                 }
 
-                                                const config = {
-                                                    type: Phaser.AUTO,
-                                                    width: window.innerWidth,
-                                                    height: window.innerHeight,
-                                                    parent: document.body,
-                                                    scene: JiuVerseIsoGame,
-                                                    audio: { noAudio: true }
-                                                };
+                                                class CanvasGame {
+                                                    constructor() {
+                                                        this.canvas = document.getElementById('canvas-fallback');
+                                                        if (this.canvas) {
+                                                            this.canvas.style.display = 'block';
+                                                            this.ctx = this.canvas.getContext('2d');
+                                                            this.resize();
+                                                        }
+                                                        window.addEventListener('resize', () => this.resize());
+                                                        
+                                                        this.keys = {};
+                                                        window.addEventListener('keydown', (e) => {
+                                                            this.keys[e.key.toUpperCase()] = true;
+                                                            this.keys[e.key] = true;
+                                                            this.handleInput();
+                                                        });
+                                                        window.addEventListener('keyup', (e) => {
+                                                            this.keys[e.key.toUpperCase()] = false;
+                                                            this.keys[e.key] = false;
+                                                        });
 
-                                                const game = new Phaser.Game(config);
+                                                        this.isMoving = false;
+                                                        this.wHalf = T_WIDTH / 2;
+                                                        this.hHalf = T_HEIGHT / 2;
+                                                        
+                                                        this.draw();
+                                                    }
+
+                                                    resize() {
+                                                        if (!this.canvas) return;
+                                                        this.canvas.width = window.innerWidth;
+                                                        this.canvas.height = window.innerHeight;
+                                                        this.originX = this.canvas.width / 2;
+                                                        this.originY = 80;
+                                                        this.draw();
+                                                    }
+
+                                                    getEnvironmentColors() {
+                                                        switch(currentEnv) {
+                                                            case 'Praça Central': return { floor: '#14532D', border: '#166534' };
+                                                            case 'Academia Carlson Gracie': return { floor: '#1e3a8a', border: '#d97706' };
+                                                            case 'Arena PvP': return { floor: '#0f172a', border: '#06b6d4' };
+                                                            case 'Loja Oficial': return { floor: '#78350f', border: '#fab23c' };
+                                                            case 'Hall da Fama': return { floor: '#f8fafc', border: '#ca8a04' };
+                                                            case 'Vestiários': return { floor: '#475569', border: '#38bdf8' };
+                                                            case 'Casas': return { floor: '#a16207', border: '#fef08a' };
+                                                            case 'Apartamentos': return { floor: '#1a202c', border: '#b45309' };
+                                                            case 'Escritórios': return { floor: '#3f220f', border: '#064e3b' };
+                                                            case 'Salas VIP': return { floor: '#991b1b', border: '#eab308' };
+                                                            default: return { floor: '#1e293b', border: '#22d3ee' };
+                                                        }
+                                                    }
+
+                                                    getBeltColorHex() {
+                                                        switch(playerBelt) {
+                                                            case 'Branca': return '#F8FAFC';
+                                                            case 'Azul': return '#2563EB';
+                                                            case 'Roxa': return '#7C3AED';
+                                                            case 'Marrom': return '#78350F';
+                                                            case 'Preta': return '#0F172A';
+                                                            default: return '#F8FAFC';
+                                                        }
+                                                    }
+
+                                                    draw() {
+                                                        const ctx = this.ctx;
+                                                        if (!ctx) return;
+                                                        ctx.fillStyle = '#020617';
+                                                        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                                                        const cfg = this.getEnvironmentColors();
+
+                                                        for (let x = 0; x < GRID_SIZE; x++) {
+                                                            for (let y = 0; y < GRID_SIZE; y++) {
+                                                                const posX = (x - y) * this.wHalf + this.originX;
+                                                                const posY = (x + y) * this.hHalf + this.originY;
+
+                                                                ctx.beginPath();
+                                                                ctx.moveTo(posX, posY - this.hHalf);
+                                                                ctx.lineTo(posX + this.wHalf, posY);
+                                                                ctx.lineTo(posX, posY + this.hHalf);
+                                                                ctx.lineTo(posX - this.wHalf, posY);
+                                                                ctx.closePath();
+                                                                ctx.fillStyle = cfg.floor;
+                                                                ctx.fill();
+                                                                ctx.strokeStyle = cfg.border;
+                                                                ctx.lineWidth = 1;
+                                                                ctx.stroke();
+
+                                                                if (x === 0 && y === 5) {
+                                                                    ctx.beginPath();
+                                                                    ctx.moveTo(posX, posY - this.hHalf + 2);
+                                                                    ctx.lineTo(posX + this.wHalf - 2, posY);
+                                                                    ctx.lineTo(posX, posY + this.hHalf - 2);
+                                                                    ctx.lineTo(posX - this.wHalf + 2, posY);
+                                                                    ctx.closePath();
+                                                                    ctx.fillStyle = 'rgba(251, 146, 60, 0.6)';
+                                                                    ctx.fill();
+                                                                }
+
+                                                                if (x === playerX && y === playerY) {
+                                                                    this.drawPlayer(posX, posY);
+                                                                }
+                                                            }
+                                                        }
+
+                                                        const npc1X = (1 - 4) * this.wHalf + this.originX;
+                                                        const npc1Y = (1 + 4) * this.hHalf + this.originY;
+                                                        this.drawNPC(npc1X, npc1Y, '#ef4444');
+
+                                                        const npc2X = (8 - 3) * this.wHalf + this.originX;
+                                                        const npc2Y = (8 + 3) * this.hHalf + this.originY;
+                                                        this.drawNPC(npc2X, npc2Y, '#10b981');
+                                                    }
+
+                                                    drawPlayer(pxX, pxY) {
+                                                        const ctx = this.ctx;
+                                                        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+                                                        ctx.beginPath();
+                                                        if (ctx.ellipse) {
+                                                            ctx.ellipse(pxX, pxY, 12, 6, 0, 0, 2 * Math.PI);
+                                                        } else {
+                                                            ctx.arc(pxX, pxY, 8, 0, 2 * Math.PI);
+                                                        }
+                                                        ctx.fill();
+
+                                                        ctx.fillStyle = '#FDBA74';
+                                                        ctx.beginPath();
+                                                        ctx.arc(pxX, pxY - 42, 10, 0, 2 * Math.PI);
+                                                        ctx.fill();
+
+                                                        ctx.fillStyle = '#1e3a8a';
+                                                        ctx.beginPath();
+                                                        ctx.moveTo(pxX - 12, pxY - 32);
+                                                        ctx.lineTo(pxX + 12, pxY - 32);
+                                                        ctx.lineTo(pxX + 10, pxY);
+                                                        ctx.lineTo(pxX - 10, pxY);
+                                                        ctx.closePath();
+                                                        ctx.fill();
+                                                        ctx.strokeStyle = '#000000';
+                                                        ctx.lineWidth = 1;
+                                                        ctx.stroke();
+
+                                                        ctx.fillStyle = this.getBeltColorHex();
+                                                        ctx.fillRect(pxX - 11, pxY - 12, 22, 5);
+                                                        ctx.fillStyle = '#EF4444';
+                                                        ctx.fillRect(pxX + 2, pxY - 12, 5, 5);
+                                                    }
+
+                                                    drawNPC(pxX, pxY, color) {
+                                                        const ctx = this.ctx;
+                                                        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                                                        ctx.beginPath();
+                                                        if (ctx.ellipse) {
+                                                            ctx.ellipse(pxX, pxY, 10, 5, 0, 0, 2 * Math.PI);
+                                                        } else {
+                                                            ctx.arc(pxX, pxY, 6, 0, 2 * Math.PI);
+                                                        }
+                                                        ctx.fill();
+
+                                                        ctx.fillStyle = color;
+                                                        ctx.fillRect(pxX - 8, pxY - 28, 16, 28);
+
+                                                        ctx.fillStyle = '#FDBA74';
+                                                        ctx.beginPath();
+                                                        ctx.arc(pxX, pxY - 34, 8, 0, 2 * Math.PI);
+                                                        ctx.fill();
+                                                    }
+
+                                                    handleInput() {
+                                                        if (this.isMoving) return;
+
+                                                        let dx = 0;
+                                                        let dy = 0;
+
+                                                        if (this.keys['ArrowLeft'] || this.keys['A']) dx = -1;
+                                                        else if (this.keys['ArrowRight'] || this.keys['D']) dx = 1;
+                                                        else if (this.keys['ArrowUp'] || this.keys['W']) dy = -1;
+                                                        else if (this.keys['ArrowDown'] || this.keys['S']) dy = 1;
+
+                                                        if (dx !== 0 || dy !== 0) {
+                                                            this.movePlayerTo(playerX + dx, playerY + dy);
+                                                        }
+                                                    }
+
+                                                    movePlayerTo(targetX, targetY) {
+                                                        if (targetX < 0 || targetX >= GRID_SIZE || targetY < 0 || targetY >= GRID_SIZE) {
+                                                            return;
+                                                        }
+
+                                                        if (targetX === 2 && targetY === 2 && currentEnv === 'Academia Carlson Gracie') {
+                                                            return;
+                                                        }
+
+                                                        this.isMoving = true;
+                                                        playerX = targetX;
+                                                        playerY = targetY;
+
+                                                        setTimeout(() => {
+                                                            this.isMoving = false;
+                                                            this.draw();
+
+                                                            if (window.AndroidWebView) {
+                                                                window.AndroidWebView.postMessage(JSON.stringify({
+                                                                    type: 'PLAYER_MOVE',
+                                                                    x: playerX,
+                                                                    y: playerY
+                                                                }));
+                                                            }
+
+                                                            if (playerX === 0 && playerY === 5) {
+                                                                this.triggerTeleportPortal();
+                                                            }
+                                                        }, 150);
+                                                    }
+
+                                                    triggerTeleportPortal() {
+                                                        const nextRoom = (currentEnv === 'Academia Carlson Gracie') ? 'Arena PvP' : 'Academia Carlson Gracie';
+                                                        currentEnv = nextRoom;
+                                                        playerX = 7;
+                                                        playerY = 7;
+                                                        this.draw();
+
+                                                        if (window.AndroidWebView) {
+                                                            window.AndroidWebView.postMessage(JSON.stringify({
+                                                                type: 'ENV_CHANGE',
+                                                                env: nextRoom,
+                                                                x: 7,
+                                                                y: 7
+                                                            }));
+                                                        }
+                                                    }
+
+                                                    forceEnvironmentChange(env) {
+                                                        currentEnv = env;
+                                                        this.draw();
+                                                    }
+
+                                                    forceBeltChange(belt) {
+                                                        playerBelt = belt;
+                                                        this.draw();
+                                                    }
+
+                                                    forcePlayerCoords(x, y) {
+                                                        playerX = x;
+                                                        playerY = y;
+                                                        this.draw();
+                                                    }
+                                                }
+
+                                                let game;
+                                                let canvasEngine;
+
+                                                if (typeof Phaser !== 'undefined') {
+                                                    engineType = 'PHASER';
+                                                    const config = {
+                                                        type: Phaser.AUTO,
+                                                        width: window.innerWidth,
+                                                        height: window.innerHeight,
+                                                        parent: document.body,
+                                                        scene: JiuVerseIsoGame,
+                                                        audio: { noAudio: true }
+                                                    };
+                                                    game = new Phaser.Game(config);
+                                                } else {
+                                                    engineType = 'CANVAS';
+                                                    canvasEngine = new CanvasGame();
+                                                }
 
                                                 window.updatePlayerCoords = function(x, y) {
-                                                    const scene = game.scene.keys['JiuVerseIsoGame'];
-                                                    if (scene) scene.forcePlayerCoords(x, y);
+                                                    if (engineType === 'PHASER' && game) {
+                                                        const scene = game.scene.keys['JiuVerseIsoGame'];
+                                                        if (scene) scene.forcePlayerCoords(x, y);
+                                                    } else if (engineType === 'CANVAS' && canvasEngine) {
+                                                        canvasEngine.forcePlayerCoords(x, y);
+                                                    }
                                                 }
 
                                                 window.changeEnvironment = function(env) {
-                                                    const scene = game.scene.keys['JiuVerseIsoGame'];
-                                                    if (scene) scene.forceEnvironmentChange(env);
+                                                    if (engineType === 'PHASER' && game) {
+                                                        const scene = game.scene.keys['JiuVerseIsoGame'];
+                                                        if (scene) scene.forceEnvironmentChange(env);
+                                                     } else if (engineType === 'CANVAS' && canvasEngine) {
+                                                        canvasEngine.forceEnvironmentChange(env);
+                                                    }
                                                 }
 
                                                 window.changePlayerBelt = function(belt) {
-                                                    const scene = game.scene.keys['JiuVerseIsoGame'];
-                                                    if (scene) scene.forceBeltChange(belt);
+                                                    if (engineType === 'PHASER' && game) {
+                                                        const scene = game.scene.keys['JiuVerseIsoGame'];
+                                                        if (scene) scene.forceBeltChange(belt);
+                                                    } else if (engineType === 'CANVAS' && canvasEngine) {
+                                                        canvasEngine.forceBeltChange(belt);
+                                                    }
                                                 }
 
                                                 window.addEventListener('resize', () => {
-                                                    game.scale.resize(window.innerWidth, window.innerHeight);
+                                                    if (engineType === 'PHASER' && game) {
+                                                        game.scale.resize(window.innerWidth, window.innerHeight);
+                                                    }
                                                 });
                                             </script>
                                         </body>
                                         </html>
                                     """.trimIndent()
 
-                                    loadDataWithBaseURL("https://phaser.io", phaserHtml, "text/html", "UTF-8", null)
+                                    loadDataWithBaseURL("https://cdnjs.cloudflare.com", phaserHtml, "text/html", "UTF-8", null)
                                     webViewRef = this
                                 }
                             },
                             update = { webView ->
-                                webView.evaluateJavascript("window.updatePlayerCoords($playerX, $playerY);", null)
-                                webView.evaluateJavascript("window.changeEnvironment('$selectedEnvironment');", null)
-                                webView.evaluateJavascript("window.changePlayerBelt('$userBelt');", null)
+                                webView.evaluateJavascript("if (window.updatePlayerCoords) { window.updatePlayerCoords($playerX, $playerY); }", null)
+                                webView.evaluateJavascript("if (window.changeEnvironment) { window.changeEnvironment('$selectedEnvironment'); }", null)
+                                webView.evaluateJavascript("if (window.changePlayerBelt) { window.changePlayerBelt('$userBelt'); }", null)
                             },
                             modifier = Modifier.fillMaxSize()
                         )

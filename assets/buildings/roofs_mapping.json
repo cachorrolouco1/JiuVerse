@@ -1,0 +1,30 @@
+{
+  "nome": "Zoneamento de Coberturas JiuVerse",
+  "descricao": "Mapeamento dos telhados estilo retrô Kenney para as estruturas urbanas e rurais",
+  "mapeamento": {
+    "Dojo_Carlson_Gracie": {
+      "id_telhado": "roof_thatch_gold",
+      "estilo": "Palha Dourada Tradicional",
+      "ponto_ancoragem_y": "topo_parede_panel",
+      "opacidade": 1.0,
+      "sombra_projetada": true,
+      "colisao_altura": 48
+    },
+    "Casas_Futuras": {
+      "id_telhado": "roof_shingle_brown",
+      "estilo": "Terracota Colonial Clássico",
+      "ponto_ancoragem_y": "topo_parede_brick",
+      "opacidade": 1.0,
+      "sombra_projetada": true,
+      "colisao_altura": 48
+    },
+    "Palacio_Hall_da_Fama": {
+      "id_telhado": "roof_slate_blue",
+      "estilo": "Escama Nobre de Slate Escuro",
+      "ponto_ancoragem_y": "topo_parede_marble",
+      "opacidade": 0.95,
+      "sombra_projetada": true,
+      "colisao_altura": 56
+    }
+  }
+}

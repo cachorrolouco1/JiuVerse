@@ -1,0 +1,34 @@
+{
+  "nome_estrutura": "Academia Carlson Gracie",
+  "descricao_estilo": "Dojo tradicional de Jiu-Jitsu brasileiro com paredes de madeira escura de carvalho e tatames clássicos azul e branco",
+  "blueprint_tilesets": {
+    "piso_principal": {
+      "tile_id": "floor_checker_blue",
+      "tipo_textura_phaser": "checker_blue_pattern",
+      "camada": "floor",
+      "rotacao_isometrica": 0
+    },
+    "paredes_laterais": {
+      "tile_id": "wall_panel_wood",
+      "tipo_textura_phaser": "isometric_wood_panel_wall",
+      "camada": "walls_boundary",
+      "alturas_isometricas_disponiveis": [48, 96]
+    },
+    "porta_entrada": {
+      "tile_id": "door_wood_stud",
+      "tipo_textura_phaser": "isometric_wood_door",
+      "camada": "doors_layer",
+      "coordenadas_ancora": {"x": 2, "y": 0}
+    },
+    "janela_dojo": {
+      "tile_id": "window_arched_glass",
+      "tipo_textura_phaser": "window_arched",
+      "camada": "windows_layer",
+      "repeticao_frequencia": 3
+    }
+  },
+  "regras_colisao_interna": {
+    "quadros_historic": {"coordenada_x": 0, "coordenada_y": 2, "solido": true},
+    "area_medalhas": {"coordenada_x": 2, "coordenada_y": 2, "solido": true}
+  }
+}

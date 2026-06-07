@@ -1,0 +1,43 @@
+{
+  "interiores": {
+    "Loja_Oficial": {
+      "piso": "floor_wood_plank",
+      "paredes": "wall_brick_red",
+      "porta": "door_wood_stud",
+      "janelas": "window_cozy_glow",
+      "telhado": "roof_shingle_brown",
+      "regras": {
+        "colisoes_balcao": [
+          {"x": 4, "y": 4},
+          {"x": 4, "y": 5}
+        ]
+      }
+    },
+    "Hall_da_Fama": {
+      "piso": "floor_checker_grey",
+      "paredes": "wall_cobble",
+      "porta": "door_arched",
+      "janelas": "window_arched_glass",
+      "telhado": "roof_slate_blue",
+      "regras": {
+        "colisoes_pedestais": [
+          {"x": 2, "y": 6},
+          {"x": 6, "y": 2},
+          {"x": 7, "y": 7}
+        ]
+      }
+    },
+    "Casas_Futuras": {
+      "piso": "floor_wood_plank",
+      "paredes": "wall_brick_red",
+      "porta": "door_wood_stud",
+      "janelas": "window_cozy_glow",
+      "telhado": "roof_shingle_brown",
+      "regras": {
+        "colisoes": [
+          {"x": 3, "y": 3}
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "nome_zona": "Praça Central (Social Plaza)",
+  "vibe_estetica": "Parque urbano verdejante com trevos decorativos, ladeado por riachos cristalinos direcionais",
+  "mapeamento_tiles": {
+    "terreno_amplo": {
+      "tile_id": "nature_grass_clove",
+      "camada": "ground",
+      "interativo": false
+    },
+    "riacho_decorativo": {
+      "tile_id": "nature_water",
+      "camada": "water_bodies",
+      "colisao": true,
+      "animado": true,
+      "velocidade_ondulacao_sprite_ms": 500
+    },
+    "caminhos_pedestre": {
+      "tile_id": "floor_mud",
+      "camada": "pathways",
+      "colisao": false
+    }
+  },
+  "pontos_interesse": {
+    "estatua_fundador": {
+      "pos_isometrica": {"x": 7, "y": 7},
+      "colisao": true,
+      "tamanho_matriz": [2, 2]
+    },
+    "portal_da_arena": {
+      "pos_isometrica": {"x": 0, "y": 5},
+      "colisao": false,
+      "particulas_glowing": "laranja"
+    }
+  }
+}

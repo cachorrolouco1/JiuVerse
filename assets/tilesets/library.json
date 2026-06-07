@@ -1,0 +1,263 @@
+{
+  "nome_biblioteca": "Kenney Retro Textures - Biblioteca Oficial de Tilesets do JiuVerse",
+  "versao_isometrica": "1.0.0",
+  "projecao": "Isométrica Dimétrica 2:1 (64x32)",
+  "categorias": {
+    "Pisos": [
+      {
+        "id": "floor_stone_brick",
+        "nome": "Tijolos de Pedra Cinza",
+        "uso_ideal": "Arena PvP (chão do mastro) ou masmorras",
+        "cor_base_hex": "#475569",
+        "colisao": false,
+        "passos_sons": "stone",
+        "render_config": {
+          "textura": "gradient_brick_pattern",
+          "escala_tile": 1.0,
+          "isometric_depth_offset": 0
+        }
+      },
+      {
+        "id": "floor_wood_plank",
+        "nome": "Pranchas de Madeira Rústica",
+        "uso_ideal": "Loja Oficial do Dojô",
+        "cor_base_hex": "#78350F",
+        "colisao": false,
+        "passos_sons": "wood",
+        "render_config": {
+          "textura": "wood_plank_pattern",
+          "escala_tile": 1.0,
+          "isometric_depth_offset": 0
+        }
+      },
+      {
+        "id": "floor_checker_blue",
+        "nome": "Xadrez Azul e Branco",
+        "uso_ideal": "Tatame de Competição da Academia Carlson Gracie",
+        "cor_base_hex": "#1e3a8a",
+        "colisao": false,
+        "passos_sons": "canvas",
+        "render_config": {
+          "textura": "checker_blue_pattern",
+          "escala_tile": 1.0,
+          "isometric_depth_offset": 0
+        }
+      },
+      {
+        "id": "floor_checker_grey",
+        "nome": "Ladrilhos Cinza Nobre",
+        "uso_ideal": "Piso Polido do Hall da Fama",
+        "cor_base_hex": "#cbd5e1",
+        "colisao": false,
+        "passos_sons": "marble",
+        "render_config": {
+          "textura": "checker_grey_pattern",
+          "escala_tile": 1.0,
+          "isometric_depth_offset": 0
+        }
+      },
+      {
+        "id": "floor_mud",
+        "nome": "Lama e Detritos com Cascalho",
+        "uso_ideal": "Quintal e caminhos rústicos ao redor das Casas Futuras",
+        "cor_base_hex": "#451a03",
+        "colisao": false,
+        "passos_sons": "dirt",
+        "render_config": {
+          "textura": "mud_rocky_pattern",
+          "escala_tile": 1.0,
+          "isometric_depth_offset": 0
+        }
+      }
+    ],
+    "Paredes": [
+      {
+        "id": "wall_cobble",
+        "nome": "Muro de Pedras Arredondadas",
+        "uso_ideal": "Bloqueios perimetrais na Arena PvP",
+        "cor_base_hex": "#334155",
+        "colisao": true,
+        "painel_altura_px": 48,
+        "render_config": {
+          "textura": "isometric_cobble_wall",
+          "face_sombreada": true,
+          "isometric_depth_offset": 1
+        }
+      },
+      {
+        "id": "wall_brick_red",
+        "nome": "Parede de Tijolos Coloniais",
+        "uso_ideal": "Fachada das Casas Futuras e Loja Oficial",
+        "cor_base_hex": "#b45309",
+        "colisao": true,
+        "painel_altura_px": 48,
+        "render_config": {
+          "textura": "isometric_brick_red_wall",
+          "face_sombreada": true,
+          "isometric_depth_offset": 1
+        }
+      },
+      {
+        "id": "wall_panel_wood",
+        "nome": "Painéis de Madeira de Carvalho",
+        "uso_ideal": "Divisórias clássicas da Academia Carlson Gracie",
+        "cor_base_hex": "#3f1b07",
+        "colisao": true,
+        "painel_altura_px": 48,
+        "render_config": {
+          "textura": "isometric_wood_panel_wall",
+          "face_sombreada": true,
+          "isometric_depth_offset": 1
+        }
+      }
+    ],
+    "Portas": [
+      {
+        "id": "door_wood_stud",
+        "nome": "Porta de Carvalho Reforçada",
+        "uso_ideal": "Entrada principal clássica da Academia Carlson Gracie",
+        "cor_base_hex": "#451a03",
+        "colisao": true,
+        "interativa": true,
+        "render_config": {
+          "textura": "isometric_wood_door",
+          "isometric_depth_offset": 2
+        }
+      },
+      {
+        "id": "door_bars",
+        "nome": "Portão de Grade de Aço",
+        "uso_ideal": "Portões das celas/limites da Arena PvP",
+        "cor_base_hex": "#27272a",
+        "colisao": true,
+        "interativa": true,
+        "render_config": {
+          "textura": "isometric_iron_bars_gate",
+          "isometric_depth_offset": 2
+        }
+      },
+      {
+        "id": "door_arched",
+        "nome": "Porta de Madeira Gótica em Arco",
+        "uso_ideal": "Entrada cerimonial do Hall da Fama",
+        "cor_base_hex": "#5c2b09",
+        "colisao": true,
+        "interativa": true,
+        "render_config": {
+          "textura": "isometric_gothic_door",
+          "isometric_depth_offset": 2
+        }
+      }
+    ],
+    "Janelas": [
+      {
+        "id": "window_arched_glass",
+        "nome": "Janela em Arco Transparente",
+        "uso_ideal": "Iluminação alta nas paredes da Academia",
+        "cor_base_hex": "#38bdf8",
+        "colisao": false,
+        "render_config": {
+          "textura": "window_arched",
+          "gargalo_parede": true,
+          "isometric_depth_offset": 2
+        }
+      },
+      {
+        "id": "window_bar_jail",
+        "nome": "Janela Gradeada de Ferro",
+        "uso_ideal": "Segurança nas paredes da Arena PvP",
+        "cor_base_hex": "#1b2a4a",
+        "colisao": false,
+        "render_config": {
+          "textura": "window_grates",
+          "gargalo_parede": true,
+          "isometric_depth_offset": 2
+        }
+      },
+      {
+        "id": "window_cozy_glow",
+        "nome": "Janela Amarela Calorosa (Acesa)",
+        "uso_ideal": "Paredes externas das Casas Futuras (aspecto residencial)",
+        "cor_base_hex": "#eab308",
+        "colisao": false,
+        "render_config": {
+          "textura": "window_glowing",
+          "emite_particulas_luz": true,
+          "isometric_depth_offset": 2
+        }
+      },
+      {
+        "id": "window_boarded",
+        "nome": "Janela Abandonada e Tábua Pregada",
+        "uso_ideal": "Visual apocalíptico das paredes da Arena PvP",
+        "cor_base_hex": "#18181b",
+        "colisao": false,
+        "render_config": {
+          "textura": "window_closed_planks",
+          "isometric_depth_offset": 2
+        }
+      }
+    ],
+    "Telhados": [
+      {
+        "id": "roof_slate_blue",
+        "nome": "Telhas Escamadas Azul Slate",
+        "uso_ideal": "Coberturas nobres do Hall da Fama",
+        "cor_base_hex": "#1e293b",
+        "colisao": true,
+        "render_config": {
+          "textura": "roof_blue_scales",
+          "isometric_depth_offset": 4
+        }
+      },
+      {
+        "id": "roof_thatch_gold",
+        "nome": "Telhado de Palha de Ouro",
+        "uso_ideal": "Cabana de treinamento da Academia Carlson Gracie",
+        "cor_base_hex": "#ca8a04",
+        "colisao": true,
+        "render_config": {
+          "textura": "roof_yellow_straw",
+          "isometric_depth_offset": 4
+        }
+      },
+      {
+        "id": "roof_shingle_brown",
+        "nome": "Telhado Colonial Terracota",
+        "uso_ideal": "Cobertura residencial das Casas Futuras",
+        "cor_base_hex": "#9a3412",
+        "colisao": true,
+        "render_config": {
+          "textura": "roof_brown_shingles",
+          "isometric_depth_offset": 4
+        }
+      }
+    ],
+    "Elementos_Naturais": [
+      {
+        "id": "nature_grass_clove",
+        "nome": "Grama Verdejante com Trevos",
+        "uso_ideal": "Substrato verde principal da Praça Central",
+        "cor_base_hex": "#15803d",
+        "colisao": false,
+        "render_config": {
+          "textura": "grass_nature_carpet",
+          "detalhes": ["clover_green_leafs", "flower_petals"],
+          "isometric_depth_offset": 0
+        }
+      },
+      {
+        "id": "nature_water",
+        "nome": "Águas Onduladas Termais",
+        "uso_ideal": "Canal de água relaxante e lagos ao lado da Praça Central",
+        "cor_base_hex": "#0f766e",
+        "colisao": true,
+        "render_config": {
+          "textura": "animated_water_surface",
+          "frequencia_ondas_ms": 500,
+          "isometric_depth_offset": 0
+        }
+      }
+    ]
+  }
+}
